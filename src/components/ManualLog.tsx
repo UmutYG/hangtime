@@ -12,15 +12,24 @@ interface Row {
 // Feeds the algorithm's estimates; never advances the program schedule.
 export function ManualLog({
   defaultLoadKg,
+  initial,
   onSave,
   onCancel,
 }: {
   defaultLoadKg: number;
+  /** pass an existing session to edit it instead of creating a new one */
+  initial?: LoggedSession;
   onSave: (session: LoggedSession) => void;
   onCancel: () => void;
 }) {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [rows, setRows] = useState<Row[]>([{ reps: '', loadKg: '0' }]);
+  const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
+  const [rows, setRows] = useState<Row[]>(
+    initial
+      ? initial.sets
+          .filter((s) => !s.isWarmup)
+          .map((s) => ({ reps: String(s.actualReps), loadKg: String(s.loadKg) }))
+      : [{ reps: '', loadKg: '0' }]
+  );
 
   const setRow = (i: number, patch: Partial<Row>) =>
     setRows((r) => r.map((row, j) => (j === i ? { ...row, ...patch } : row)));
@@ -33,21 +42,25 @@ export function ManualLog({
   const save = () => {
     if (!valid) return;
     onSave({
-      id: `manual-${date}-${Math.random().toString(36).slice(2, 8)}`,
+      id: initial?.id ?? `manual-${date}-${Math.random().toString(36).slice(2, 8)}`,
+      dayKind: initial?.dayKind ?? 'custom',
+      cycle: initial?.cycle ?? 0,
+      week: initial?.week ?? 0,
+      readiness: initial?.readiness,
+      lastSetEffort: initial?.lastSetEffort,
+      progressionExempt: initial?.progressionExempt,
       date,
-      dayKind: 'custom',
-      cycle: 0,
-      week: 0,
       sets: parsed.map((r) => ({ targetReps: r.reps, actualReps: r.reps, loadKg: r.loadKg })),
     });
   };
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Log your own workout</Text>
+      <Text style={styles.title}>{initial ? 'Edit workout' : 'Log your own workout'}</Text>
       <Text style={styles.sub}>
-        Counts toward your stats and tunes the program's estimates. It won't replace a planned
-        session.
+        {initial
+          ? 'Changing sets recalculates all your stats and estimates.'
+          : "Counts toward your stats and tunes the program's estimates. It won't replace a planned session."}
       </Text>
 
       <View style={styles.card}>

@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { applyResult } from '../engine/stateMachine';
+import { applyResult, replayAll } from '../engine/stateMachine';
 import { LoggedSession, Profile, Store } from '../engine/types';
 import { initialState } from '../engine/generator';
 import { emptyStore, importJson, loadStore, saveStore, stamp } from '../lib/storage';
@@ -20,6 +20,10 @@ interface StoreApi {
   createProfile: (p: Profile) => void;
   updateProfile: (patch: Partial<Profile>) => void;
   completeSession: (session: LoggedSession) => { prCount: number };
+  editSession: (session: LoggedSession) => void;
+  deleteSession: (id: string) => void;
+  restoreSession: (id: string) => void;
+  emptyTrash: () => void;
   importStore: (json: string) => boolean;
   resetAll: () => void;
   syncNow: () => Promise<void>;
@@ -118,6 +122,57 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [update]
   );
 
+  // history edits treat sessions as the source of truth and replay everything
+  const rebuilt = (s: Store, sessions: LoggedSession[], trash: LoggedSession[]): Store => {
+    if (!s.profile) return { ...s, sessions, trash };
+    const r = replayAll(s.profile, sessions);
+    return { ...s, sessions, trash, ...r };
+  };
+
+  const editSession = useCallback(
+    (session: LoggedSession) => {
+      update((s) =>
+        rebuilt(
+          s,
+          s.sessions.map((x) => (x.id === session.id ? session : x)),
+          s.trash
+        )
+      );
+    },
+    [update]
+  );
+
+  const deleteSession = useCallback(
+    (id: string) => {
+      update((s) => {
+        const target = s.sessions.find((x) => x.id === id);
+        if (!target) return s;
+        return rebuilt(
+          s,
+          s.sessions.filter((x) => x.id !== id),
+          [target, ...s.trash].slice(0, 20)
+        );
+      });
+    },
+    [update]
+  );
+
+  const restoreSession = useCallback(
+    (id: string) => {
+      update((s) => {
+        const target = s.trash.find((x) => x.id === id);
+        if (!target) return s;
+        const sessions = [...s.sessions, target].sort((a, b) => a.date.localeCompare(b.date));
+        return rebuilt(s, sessions, s.trash.filter((x) => x.id !== id));
+      });
+    },
+    [update]
+  );
+
+  const emptyTrash = useCallback(() => {
+    update((s) => ({ ...s, trash: [] }));
+  }, [update]);
+
   const importStore = useCallback(
     (json: string): boolean => {
       try {
@@ -161,6 +216,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         createProfile,
         updateProfile,
         completeSession,
+        editSession,
+        deleteSession,
+        restoreSession,
+        emptyTrash,
         importStore,
         resetAll,
         syncNow,

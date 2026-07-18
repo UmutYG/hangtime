@@ -3,7 +3,7 @@ import { Text, View, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoreProvider, useStore } from './src/hooks/useStore';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { ProgressScreen } from './src/screens/ProgressScreen';
@@ -28,15 +28,23 @@ const navTheme = {
 const ICONS: Record<string, string> = { Today: '●', Progress: '▲', Program: '≡' };
 
 function Tabs() {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: theme.accent,
         tabBarInactiveTintColor: theme.textFaint,
-        tabBarStyle: { backgroundColor: theme.card, borderTopColor: theme.border },
+        tabBarStyle: {
+          backgroundColor: theme.card,
+          borderTopColor: theme.border,
+          height: 66 + insets.bottom,
+          paddingTop: 8,
+          paddingBottom: Math.max(insets.bottom, 8),
+        },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
         tabBarIcon: ({ color }) => (
-          <Text style={{ color, fontSize: 14 }}>{ICONS[route.name]}</Text>
+          <Text style={{ color, fontSize: 24, lineHeight: 28 }}>{ICONS[route.name]}</Text>
         ),
       })}
     >
@@ -49,6 +57,7 @@ function Tabs() {
 
 function Root() {
   const { store, ready } = useStore();
+  const insets = useSafeAreaInsets();
   if (!ready) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center' }}>
@@ -56,11 +65,17 @@ function Root() {
       </View>
     );
   }
-  if (!store.profile) return <OnboardingScreen />;
+  // one place handles the notch for every screen; the tab bar handles the bottom
   return (
-    <NavigationContainer theme={navTheme}>
-      <Tabs />
-    </NavigationContainer>
+    <View style={{ flex: 1, backgroundColor: theme.bg, paddingTop: insets.top }}>
+      {!store.profile ? (
+        <OnboardingScreen />
+      ) : (
+        <NavigationContainer theme={navTheme}>
+          <Tabs />
+        </NavigationContainer>
+      )}
+    </View>
   );
 }
 

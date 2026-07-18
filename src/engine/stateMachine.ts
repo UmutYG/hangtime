@@ -8,7 +8,30 @@ import {
 } from './types';
 import * as C from './constants';
 import { addedLoadForReps, e1rmSystem, roundToIncrement } from './epley';
-import { fixedRepRange } from './generator';
+import { fixedRepRange, initialState } from './generator';
+
+/**
+ * Rebuild all derived state by replaying the session log from scratch.
+ * This is what makes history edit/delete safe: sessions are the source of
+ * truth; state, PRs, tests and the lifetime counter are projections.
+ */
+export function replayAll(
+  profile: Profile,
+  sessions: LoggedSession[]
+): { state: ProgramState; prs: PR[]; tests: TestPoint[]; lifetimeReps: number } {
+  let state = initialState(profile);
+  const prs: PR[] = [];
+  const tests: TestPoint[] = [];
+  let lifetimeReps = 0;
+  for (const session of sessions) {
+    const out = applyResult(profile, state, session, prs);
+    state = out.state;
+    prs.push(...out.newPrs);
+    tests.push(...out.newTests);
+    lifetimeReps += out.repsDone;
+  }
+  return { state, prs, tests, lifetimeReps };
+}
 
 /** Fixed-vest heavy day: progress reps → add a 5th set → shorten rests → advise more load. */
 function applyFixedHeavy(

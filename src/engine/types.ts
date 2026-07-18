@@ -163,6 +163,8 @@ export interface Store {
   prs: PR[];
   tests: TestPoint[];
   lifetimeReps: number;
+  /** soft-deleted sessions — restorable until emptied */
+  trash: LoggedSession[];
   /** last local mutation, ISO datetime — drives cloud-sync conflict resolution */
   updatedAt?: string;
 }

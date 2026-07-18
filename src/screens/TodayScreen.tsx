@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { generateSession } from '../engine/generator';
 import { Effort, LoggedSession, Readiness, SessionPlan } from '../engine/types';
 import { useStore } from '../hooks/useStore';
@@ -181,6 +181,17 @@ export function TodayScreen() {
         onExtendRest={() => setRestEndsAt((t) => (t ? t + 30_000 : t))}
         onRestDone={() => setRestEndsAt(null)}
         onEndEarly={() => (hasWeightedSets ? setPhase('effort') : finish())}
+        onDiscard={() => {
+          const go = () => resetToIdle();
+          if (Platform.OS === 'web') {
+            if (window.confirm('Discard this session? Nothing will be saved.')) go();
+          } else {
+            Alert.alert('Discard session?', 'Nothing will be saved.', [
+              { text: 'Keep going', style: 'cancel' },
+              { text: 'Discard', style: 'destructive', onPress: go },
+            ]);
+          }
+        }}
       />
     );
   }

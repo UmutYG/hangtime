@@ -148,7 +148,7 @@ export function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 24, gap: 14, paddingTop: 70, paddingBottom: 50, maxWidth: 480, width: '100%', alignSelf: 'center' },
+  content: { padding: 24, gap: 14, paddingTop: 28, paddingBottom: 50, maxWidth: 480, width: '100%', alignSelf: 'center' },
   logo: { color: theme.accent, fontSize: 30, fontWeight: '900', letterSpacing: 4 },
   tag: { color: theme.textDim, fontSize: 14, marginTop: -8, marginBottom: 10 },
   card: {

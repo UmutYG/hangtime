@@ -33,6 +33,7 @@ export function SessionPlayer({
   onExtendRest,
   onRestDone,
   onEndEarly,
+  onDiscard,
 }: {
   plan: SessionPlan;
   actuals: (number | null)[];
@@ -44,6 +45,7 @@ export function SessionPlayer({
   onExtendRest: () => void;
   onRestDone: () => void;
   onEndEarly: () => void;
+  onDiscard: () => void;
 }) {
   const [now, setNow] = useState(Date.now());
   const resting = restEndsAt !== null;
@@ -79,7 +81,12 @@ export function SessionPlayer({
     <View style={styles.screen}>
       {/* progress header */}
       <View style={styles.header}>
-        <Text style={type.kicker}>{plan.title}</Text>
+        <View style={styles.titleRow}>
+          <Text style={[type.kicker, { flex: 1 }]}>{plan.title}</Text>
+          <Pressable onPress={onDiscard} hitSlop={12} style={styles.cancelBtn}>
+            <Text style={styles.cancelText}>✕</Text>
+          </Pressable>
+        </View>
         <View style={styles.progressRow}>
           {plan.sets.map((_, i) => (
             <View
@@ -201,6 +208,18 @@ export function SessionPlayer({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.bg, padding: theme.pad, gap: 14 },
   header: { gap: 10 },
+  titleRow: { flexDirection: 'row', alignItems: 'center' },
+  cancelBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelText: { color: theme.textDim, fontSize: 13, fontWeight: '700' },
   progressRow: { flexDirection: 'row', gap: 4 },
   segment: { flex: 1, height: 4, borderRadius: 2, backgroundColor: theme.cardRaised },
   segmentDone: { backgroundColor: theme.accent },

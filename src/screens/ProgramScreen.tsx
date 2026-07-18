@@ -16,29 +16,8 @@ import { theme, mono } from '../theme';
 
 const WEEK_LABELS = ['Build', 'Build', 'Build', 'Deload + Test'];
 
-const DAY_EXPLAINERS_FIXED = {
-  title: 'Day 1 · Vest',
-  body: 'Weighted pull-ups with your vest. The load is fixed, so the program progresses the other levers real programs use: reps per set first, then a 5th set, then shorter rests. Your all-out last set recalibrates the targets every session.',
-};
-
-const DAY_EXPLAINERS = [
-  {
-    title: 'Day 1 · Heavy',
-    body: 'Weighted pull-ups, 4 sets of 4–6 reps, 3-minute rests. The load stays fixed while your reps grow; when every set hits 6, the belt gets heavier. This "double progression" is the engine behind your strength — and it also pushes your max reps up.',
-  },
-  {
-    title: 'Day 2 · Volume',
-    body: '10 short bodyweight sets at half your best max set, only 60 seconds rest. Easy sets, big total. This is the K Boges sub-max method: rep capacity grows while you stay fresh.',
-  },
-  {
-    title: 'Day 3 · Max or Ladders',
-    body: 'Alternates weekly. Max day: 3 all-out sets with full rest — where rep PRs happen. Ladder day: climb 1, 2, 3… reps, stop before doubt. Both train your nervous system to express the strength the other days build.',
-  },
-  {
-    title: 'Week 4 · Deload + Test',
-    body: 'Every 4th week the volume halves. Fatigue drains, adaptations stay — then you test fresh: bodyweight max one cycle, weighted 5RM the next. Test results retune every number in the program.',
-  },
-];
+// Program education lives contextually in each session's "why" card —
+// this screen only answers "where am I" and holds settings.
 
 const SYNC_LABEL: Record<string, string> = {
   unavailable: 'iCloud unavailable — works after the TestFlight build (not in Expo Go)',
@@ -139,27 +118,6 @@ export function ProgramScreen() {
               {' '}· est. system 1RM: <Text style={mono}>{Math.round(s.e1rmKg)} kg</Text>
             </>
           ) : null}
-        </Text>
-      </View>
-
-      <Text style={styles.h2}>How it works</Text>
-      {(profile.equipment.mode === 'fixed'
-        ? [DAY_EXPLAINERS_FIXED, ...DAY_EXPLAINERS.slice(1)]
-        : DAY_EXPLAINERS
-      ).map((d) => (
-        <View key={d.title} style={styles.card}>
-          <Text style={styles.cardTitle}>{d.title}</Text>
-          <Text style={styles.cardBody}>{d.body}</Text>
-        </View>
-      ))}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>The rules the engine follows</Text>
-        <Text style={styles.cardBody}>
-          • Pass a heavy day → +2.5 kg (small plate if progress is hard-won).{'\n'}
-          • Miss once → repeat, no penalty. Miss twice → automatic deload.{'\n'}
-          • Rough day → one set removed, session can't count against you.{'\n'}
-          • 8+ days away → gentle ramp-back session.{'\n'}
-          • Tests only ever move your targets up, never down.
         </Text>
       </View>
 

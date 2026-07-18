@@ -1,5 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import { LoggedSession } from '../engine/types';
+import { ManualLog } from '../components/ManualLog';
 import { useStore } from '../hooks/useStore';
 import { computeGoals } from '../engine/goals';
 import { e1rmSystem } from '../engine/epley';
@@ -9,11 +18,26 @@ import { TrendChart, Point } from '../components/TrendChart';
 type Metric = 'e1rm' | 'bwMax';
 type Range = '1m' | '3m' | 'all';
 
+const DAY_LABEL: Record<string, string> = {
+  calibration: 'Calibration',
+  heavy: 'Vest day',
+  volume: 'Volume',
+  max: 'Max day',
+  ladder: 'Ladders',
+  deloadHeavy: 'Deload',
+  deloadVolume: 'Deload',
+  testBw: 'BW test',
+  testWeighted: 'Vest test',
+  custom: 'Own workout',
+};
+
 export function ProgressScreen() {
-  const { store } = useStore();
+  const { store, editSession, deleteSession, restoreSession, emptyTrash } = useStore();
   const { width } = useWindowDimensions();
   const [metric, setMetric] = useState<Metric>('e1rm');
   const [range, setRange] = useState<Range>('3m');
+  const [editing, setEditing] = useState<LoggedSession | null>(null);
+  const [trashOpen, setTrashOpen] = useState(false);
 
   const profile = store.profile!;
 
@@ -75,6 +99,20 @@ export function ProgressScreen() {
 
   const chartWidth = Math.min(width, 480) - theme.pad * 2 - 24;
 
+  if (editing) {
+    return (
+      <ManualLog
+        defaultLoadKg={profile.equipment.fixedLoadKg}
+        initial={editing}
+        onCancel={() => setEditing(null)}
+        onSave={(session) => {
+          editSession(session);
+          setEditing(null);
+        }}
+      />
+    );
+  }
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.h1}>Progress</Text>
@@ -130,6 +168,69 @@ export function ProgressScreen() {
           </View>
         ))
       )}
+
+      <Text style={styles.h2}>History</Text>
+      {store.sessions.length === 0 ? (
+        <Text style={styles.dim}>Your logged sessions appear here.</Text>
+      ) : (
+        [...store.sessions]
+          .reverse()
+          .slice(0, 15)
+          .map((s) => {
+            const reps = s.sets.reduce((sum, x) => sum + x.actualReps, 0);
+            const topLoad = Math.max(0, ...s.sets.map((x) => x.loadKg));
+            return (
+              <View key={s.id} style={styles.histRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.histTitle}>{DAY_LABEL[s.dayKind] ?? s.dayKind}</Text>
+                  <Text style={styles.histMeta}>
+                    {s.date} · <Text style={mono}>{reps}</Text> reps
+                    {topLoad > 0 ? (
+                      <>
+                        {' '}· <Text style={mono}>+{topLoad} kg</Text>
+                      </>
+                    ) : null}
+                  </Text>
+                </View>
+                <Pressable onPress={() => setEditing(s)} hitSlop={8} style={styles.histBtn}>
+                  <Text style={styles.histBtnText}>Edit</Text>
+                </Pressable>
+                <Pressable onPress={() => deleteSession(s.id)} hitSlop={8} style={styles.histBtn}>
+                  <Text style={styles.histTrash}>🗑</Text>
+                </Pressable>
+              </View>
+            );
+          })
+      )}
+      {store.trash.length > 0 ? (
+        <View style={styles.card}>
+          <Pressable onPress={() => setTrashOpen(!trashOpen)}>
+            <Text style={styles.trashHeader}>
+              🗑 Recently deleted ({store.trash.length}) — tap to {trashOpen ? 'hide' : 'show'}
+            </Text>
+          </Pressable>
+          {trashOpen
+            ? store.trash.map((s) => (
+                <View key={s.id} style={styles.histRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.histTitle}>{DAY_LABEL[s.dayKind] ?? s.dayKind}</Text>
+                    <Text style={styles.histMeta}>
+                      {s.date} · {s.sets.reduce((sum, x) => sum + x.actualReps, 0)} reps
+                    </Text>
+                  </View>
+                  <Pressable onPress={() => restoreSession(s.id)} style={styles.histBtn}>
+                    <Text style={[styles.histBtnText, { color: theme.good }]}>Restore</Text>
+                  </Pressable>
+                </View>
+              ))
+            : null}
+          {trashOpen ? (
+            <Pressable onPress={emptyTrash} style={{ paddingVertical: 6 }}>
+              <Text style={styles.emptyTrash}>Empty trash</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       <Text style={styles.h2}>Personal records</Text>
       {store.prs.length === 0 ? (
@@ -240,4 +341,27 @@ const styles = StyleSheet.create({
   },
   prText: { color: theme.text, fontSize: 14, flex: 1 },
   prDate: { color: theme.textFaint, fontSize: 12 },
+  histRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.card,
+    borderRadius: theme.radius,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  histTitle: { color: theme.text, fontSize: 14, fontWeight: '600' },
+  histMeta: { color: theme.textFaint, fontSize: 12, marginTop: 1 },
+  histBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 9,
+    backgroundColor: theme.cardRaised,
+  },
+  histBtnText: { color: theme.textDim, fontSize: 12, fontWeight: '600' },
+  histTrash: { fontSize: 13 },
+  trashHeader: { color: theme.textDim, fontSize: 13, fontWeight: '600' },
+  emptyTrash: { color: theme.danger, fontSize: 12 },
 });

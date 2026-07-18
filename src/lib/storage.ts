@@ -35,6 +35,7 @@ export function emptyStore(): Store {
     prs: [],
     tests: [],
     lifetimeReps: 0,
+    trash: [],
   };
 }
 

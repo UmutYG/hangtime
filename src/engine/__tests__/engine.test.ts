@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateSession, initialState, resolveDayKind } from '../generator';
-import { applyResult } from '../stateMachine';
+import { applyResult, replayAll } from '../stateMachine';
 import { computeGoals } from '../goals';
 import { e1rmSystem, addedLoadForReps } from '../epley';
 import {
@@ -424,6 +424,34 @@ describe('fixed-vest mode', () => {
     const out = applyResult(vestProfile, state, log, []);
     expect(out.state.weighted.loadKg).toBe(7.5);
     expect(out.state.e1rmKg).toBeCloseTo(e1rmSystem(82, 7.5, 15), 1);
+  });
+});
+
+describe('replayAll (history edit/delete safety)', () => {
+  it('replaying the full log reproduces the same state as live application', () => {
+    let state = initialState(vestProfile);
+    const prs: PR[] = [];
+    const sessions: LoggedSession[] = [];
+    for (let i = 0; i < 9; i++) {
+      const date = nextDate();
+      const plan = generateSession(vestProfile, state, date);
+      const log = logPerfect(plan, date, { effort: 'right', amrapReps: 13 });
+      sessions.push(log);
+      const out = applyResult(vestProfile, state, log, prs);
+      prs.push(...out.newPrs);
+      state = out.state;
+    }
+    const replayed = replayAll(vestProfile, sessions);
+    expect(replayed.state).toEqual(state);
+    expect(replayed.prs).toEqual(prs);
+    // deleting the last session rewinds the schedule and the counters
+    const withoutLast = replayAll(vestProfile, sessions.slice(0, -1));
+    expect(withoutLast.lifetimeReps).toBeLessThan(replayed.lifetimeReps);
+    expect([
+      withoutLast.state.cycle,
+      withoutLast.state.week,
+      withoutLast.state.sessionInWeek,
+    ]).not.toEqual([state.cycle, state.week, state.sessionInWeek]);
   });
 });
 
