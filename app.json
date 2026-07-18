@@ -1,13 +1,15 @@
 {
   "expo": {
-    "name": "hangtime",
+    "name": "Hangtime",
     "slug": "hangtime",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.umutyg.hangtime",
+      "buildNumber": "1",
+      "supportsTablet": false
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +21,20 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "bundler": "metro",
+      "output": "single",
+      "themeColor": "#0C0C0E",
+      "backgroundColor": "#0C0C0E",
+      "name": "Hangtime",
+      "shortName": "Hangtime",
+      "description": "Pull-ups. Auto-planned. Explained."
+    },
+    "backgroundColor": "#0C0C0E",
+    "splash": {
+      "backgroundColor": "#0C0C0E"
+    },
+    "experiments": {
+      "baseUrl": "/hangtime"
     }
   }
 }
