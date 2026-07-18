@@ -40,8 +40,17 @@ const DAY_EXPLAINERS = [
   },
 ];
 
+const SYNC_LABEL: Record<string, string> = {
+  unavailable: 'iCloud unavailable — works after the TestFlight build (not in Expo Go)',
+  idle: 'iCloud — waiting',
+  syncing: 'iCloud — syncing…',
+  synced: 'iCloud — synced',
+  error: 'iCloud — sync failed, will retry on next change',
+};
+
 export function ProgramScreen() {
-  const { store, updateProfile, importStore, resetAll } = useStore();
+  const { store, updateProfile, importStore, resetAll, syncState, lastSyncedAt, syncNow } =
+    useStore();
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [bwText, setBwText] = useState('');
@@ -212,6 +221,26 @@ export function ProgramScreen() {
         </View>
       ) : null}
 
+      <Pressable onPress={() => void syncNow()} style={styles.card}>
+        <View style={styles.rowGap}>
+          <View
+            style={[
+              styles.syncDot,
+              syncState === 'synced' && { backgroundColor: theme.good },
+              syncState === 'error' && { backgroundColor: theme.danger },
+              syncState === 'syncing' && { backgroundColor: theme.warn },
+            ]}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>{SYNC_LABEL[syncState]}</Text>
+            <Text style={styles.cardBody}>
+              {lastSyncedAt
+                ? `Last synced ${lastSyncedAt.slice(11, 16)} · tap to sync now`
+                : 'Backs up automatically after every session · tap to sync now'}
+            </Text>
+          </View>
+        </View>
+      </Pressable>
       <View style={styles.rowGap}>
         <Pressable onPress={doExport} style={[styles.smallBtn, { flex: 1 }]}>
           <Text style={styles.smallBtnText}>Export backup</Text>
@@ -295,4 +324,11 @@ const styles = StyleSheet.create({
   smallBtnText: { color: theme.text, fontSize: 13, fontWeight: '600' },
   dangerBtn: { alignItems: 'center', paddingVertical: 12 },
   dangerText: { color: theme.danger, fontSize: 13 },
+  syncDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.textFaint,
+    marginTop: 4,
+  },
 });

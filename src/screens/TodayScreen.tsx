@@ -1,26 +1,25 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { generateSession } from '../engine/generator';
-import { LoggedSession, Readiness, SessionPlan, Effort } from '../engine/types';
+import { Effort, LoggedSession, Readiness, SessionPlan } from '../engine/types';
 import { useStore } from '../hooks/useStore';
-import { theme, mono } from '../theme';
+import { theme, mono, type } from '../theme';
 import { WhyCard } from '../components/WhyCard';
-import { SetRow } from '../components/SetRow';
-import { RestTimer } from '../components/RestTimer';
+import { SessionPlayer } from '../components/SessionPlayer';
 import { ManualLog } from '../components/ManualLog';
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-const READINESS: Array<{ key: Readiness; label: string; emoji: string }> = [
-  { key: 'good', label: 'Good', emoji: '⚡' },
-  { key: 'ok', label: 'OK', emoji: '😐' },
-  { key: 'rough', label: 'Rough', emoji: '🥱' },
+const READINESS: Array<{ key: Readiness; label: string }> = [
+  { key: 'good', label: 'Good' },
+  { key: 'ok', label: 'OK' },
+  { key: 'rough', label: 'Rough' },
 ];
 
 const EFFORTS: Array<{ key: Effort; label: string; hint: string }> = [
-  { key: 'easy', label: 'Easy', hint: '3+ reps left' },
+  { key: 'easy', label: 'Easy', hint: '3+ reps left in the tank' },
   { key: 'right', label: 'Right', hint: '1–2 reps left' },
   { key: 'grind', label: 'Grind', hint: 'nothing left' },
 ];
@@ -32,7 +31,6 @@ export function TodayScreen() {
   const [actuals, setActuals] = useState<(number | null)[]>([]);
   const [cursor, setCursor] = useState(0);
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
-  const [effort, setEffort] = useState<Effort>('right');
   const [summary, setSummary] = useState<{ reps: number; prCount: number } | null>(null);
   const [planSnapshot, setPlanSnapshot] = useState<SessionPlan | null>(null);
 
@@ -54,30 +52,22 @@ export function TodayScreen() {
 
   const completeCurrent = () => {
     const set = activePlan.sets[cursor];
-    setActuals((a) => {
-      const next = [...a];
-      next[cursor] = set.targetReps;
-      return next;
-    });
+    const nextActuals = [...actuals];
+    nextActuals[cursor] = set.targetReps;
+    setActuals(nextActuals);
     const isLast = cursor === activePlan.sets.length - 1;
     if (isLast) {
       setRestEndsAt(null);
-      setPhase(hasWeightedSets ? 'effort' : 'summary');
-      if (!hasWeightedSets) finish(undefined, actualsWith(set.targetReps));
+      if (hasWeightedSets) setPhase('effort');
+      else finish(undefined, nextActuals);
     } else {
       if (set.restSecAfter > 0) setRestEndsAt(Date.now() + set.restSecAfter * 1000);
       setCursor(cursor + 1);
     }
   };
 
-  const actualsWith = (lastVal: number): number[] => {
-    const a = [...actuals];
-    a[cursor] = lastVal;
-    return a.map((v, i) => v ?? (i < cursor ? activePlan.sets[i].targetReps : 0));
-  };
-
-  const finish = (chosenEffort?: Effort, finalActuals?: number[]) => {
-    const acts = finalActuals ?? actuals.map((v) => v ?? 0);
+  const finish = (chosenEffort?: Effort, finalActuals?: (number | null)[]) => {
+    const acts = (finalActuals ?? actuals).map((v) => v ?? 0);
     const session: LoggedSession = {
       id: `${todayIso()}-${activePlan.dayKind}-${Date.now()}`,
       date: todayIso(),
@@ -108,14 +98,13 @@ export function TodayScreen() {
     setRestEndsAt(null);
   };
 
-  const doneThisWeek = store.sessions.filter((s) => {
-    const d = new Date(s.date);
+  const doneThisWeek = useMemo(() => {
     const now = new Date();
     const monday = new Date(now);
     monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
     monday.setHours(0, 0, 0, 0);
-    return d >= monday;
-  }).length;
+    return store.sessions.filter((s) => new Date(s.date) >= monday).length;
+  }, [store.sessions]);
 
   if (phase === 'manual') {
     return (
@@ -137,16 +126,16 @@ export function TodayScreen() {
       <View style={[styles.screen, styles.center]}>
         {summary.prCount > 0 ? (
           <>
-            <Text style={styles.prBig}>🎉 PR!</Text>
-            <Text style={styles.prSub}>
-              {summary.prCount === 1 ? 'New personal record' : `${summary.prCount} new personal records`}
-            </Text>
+            <Text style={styles.prEmoji}>🎉</Text>
+            <Text style={styles.prTitle}>Personal record</Text>
           </>
         ) : (
-          <Text style={styles.summaryTitle}>Session done</Text>
+          <Text style={type.title}>Session done</Text>
         )}
-        <Text style={[styles.summaryReps, mono]}>{summary.reps}</Text>
-        <Text style={styles.summarySub}>reps banked · lifetime {store.lifetimeReps}</Text>
+        <Text style={[type.giant, mono]}>{summary.reps}</Text>
+        <Text style={styles.summarySub}>
+          reps banked · lifetime <Text style={mono}>{store.lifetimeReps}</Text>
+        </Text>
         <Pressable onPress={resetToIdle} style={styles.primaryBtn}>
           <Text style={styles.primaryBtnText}>Nice</Text>
         </Pressable>
@@ -157,24 +146,17 @@ export function TodayScreen() {
   if (phase === 'effort') {
     return (
       <View style={[styles.screen, styles.center]}>
-        <Text style={styles.summaryTitle}>How was the last working set?</Text>
+        <Text style={type.title}>How was the last working set?</Text>
         <View style={{ gap: 10, width: '100%', maxWidth: 420 }}>
           {EFFORTS.map((e) => (
-            <Pressable
-              key={e.key}
-              onPress={() => {
-                setEffort(e.key);
-                finish(e.key);
-              }}
-              style={styles.effortBtn}
-            >
+            <Pressable key={e.key} onPress={() => finish(e.key)} style={styles.effortBtn}>
               <Text style={styles.effortLabel}>{e.label}</Text>
               <Text style={styles.effortHint}>{e.hint}</Text>
             </Pressable>
           ))}
         </View>
         <Text style={styles.effortNote}>
-          This is how the program knows when to add weight — answer honestly.
+          This is how the program decides your next session — answer honestly.
         </Text>
       </View>
     );
@@ -182,58 +164,54 @@ export function TodayScreen() {
 
   if (phase === 'active') {
     return (
-      <ScrollView style={styles.screen} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.kicker}>
-          {activePlan.title.toUpperCase()} · SET {Math.min(cursor + 1, activePlan.sets.length)}/
-          {activePlan.sets.length}
-        </Text>
-        {restEndsAt ? (
-          <RestTimer
-            endsAt={restEndsAt}
-            onDone={() => setRestEndsAt(null)}
-            onSkip={() => setRestEndsAt(null)}
-            onExtend={() => setRestEndsAt((t) => (t ? t + 30_000 : t))}
-          />
-        ) : null}
-        <View style={{ gap: 8 }}>
-          {activePlan.sets.map((s, i) => (
-            <SetRow
-              key={i}
-              set={s}
-              index={activePlan.sets.slice(0, i + 1).filter((x) => !x.isWarmup).length}
-              state={i < cursor ? 'done' : i === cursor && !restEndsAt ? 'current' : i === cursor ? 'current' : 'upcoming'}
-              actualReps={actuals[i]}
-              onComplete={completeCurrent}
-              onAdjust={(delta) =>
-                setActuals((a) => {
-                  const next = [...a];
-                  next[i] = Math.max(0, (next[i] ?? 0) + delta);
-                  return next;
-                })
-              }
-            />
-          ))}
-        </View>
-        <Pressable
-          onPress={() => (hasWeightedSets ? setPhase('effort') : finish())}
-          style={styles.endEarly}
-        >
-          <Text style={styles.endEarlyText}>End session early</Text>
-        </Pressable>
-      </ScrollView>
+      <SessionPlayer
+        plan={activePlan}
+        actuals={actuals}
+        cursor={cursor}
+        restEndsAt={restEndsAt}
+        onCompleteCurrent={completeCurrent}
+        onAdjust={(i, delta) =>
+          setActuals((a) => {
+            const next = [...a];
+            next[i] = Math.max(0, (next[i] ?? 0) + delta);
+            return next;
+          })
+        }
+        onSkipRest={() => setRestEndsAt(null)}
+        onExtendRest={() => setRestEndsAt((t) => (t ? t + 30_000 : t))}
+        onRestDone={() => setRestEndsAt(null)}
+        onEndEarly={() => (hasWeightedSets ? setPhase('effort') : finish())}
+      />
     );
   }
 
   // idle
+  const workingSets = plan.sets.filter((s) => !s.isWarmup);
+  const maxLoad = Math.max(...plan.sets.map((s) => s.loadKg));
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.scrollContent}>
-      <Text style={styles.kicker}>
-        CYCLE {plan.cycle} · WEEK {plan.week} · SESSION {doneThisWeek + 1 > 3 ? 3 : doneThisWeek + 1}/3 THIS WEEK
-      </Text>
-      <Text style={styles.title}>{plan.title}</Text>
+      <View style={styles.chipRow}>
+        <View style={styles.chip}>
+          <Text style={styles.chipText}>Cycle {plan.cycle}</Text>
+        </View>
+        <View style={styles.chip}>
+          <Text style={styles.chipText}>Week {plan.week}/4</Text>
+        </View>
+        <View style={styles.chip}>
+          <Text style={styles.chipText}>{Math.min(doneThisWeek + 1, 3)}/3 this week</Text>
+        </View>
+      </View>
+      <Text style={type.hero}>{plan.title}</Text>
       <Text style={styles.subtitle}>
-        {plan.sets.filter((s) => !s.isWarmup).length} working sets
-        {plan.sets.some((s) => s.loadKg > 0) ? ` · up to +${Math.max(...plan.sets.map((s) => s.loadKg))} kg` : ' · bodyweight'}
+        <Text style={[mono, { color: theme.text }]}>{workingSets.length}</Text> working sets
+        {maxLoad > 0 ? (
+          <>
+            {' '}·{' '}
+            <Text style={[mono, { color: theme.text }]}>+{maxLoad} kg</Text>
+          </>
+        ) : (
+          ' · bodyweight'
+        )}
       </Text>
       <WhyCard why={plan.why} detail={plan.whyDetail} />
       <View style={styles.readinessRow}>
@@ -244,8 +222,12 @@ export function TodayScreen() {
             onPress={() => setReadiness(readiness === r.key ? undefined : r.key)}
             style={[styles.readinessBtn, readiness === r.key && styles.readinessActive]}
           >
-            <Text style={styles.readinessEmoji}>{r.emoji}</Text>
-            <Text style={[styles.readinessText, readiness === r.key && { color: theme.text }]}>
+            <Text
+              style={[
+                styles.readinessText,
+                readiness === r.key && { color: theme.onAccent },
+              ]}
+            >
               {r.label}
             </Text>
           </Pressable>
@@ -254,8 +236,8 @@ export function TodayScreen() {
       <Pressable onPress={start} style={styles.primaryBtn}>
         <Text style={styles.primaryBtnText}>Start session</Text>
       </Pressable>
-      <Pressable onPress={() => setPhase('manual')} style={styles.endEarly}>
-        <Text style={styles.endEarlyText}>Log a workout you did on your own</Text>
+      <Pressable onPress={() => setPhase('manual')} style={styles.linkBtn}>
+        <Text style={styles.linkText}>Log a workout you did on your own</Text>
       </Pressable>
     </ScrollView>
   );
@@ -263,51 +245,52 @@ export function TodayScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.bg },
-  scrollContent: { padding: theme.pad, gap: 14, paddingBottom: 40 },
-  center: { alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 },
-  kicker: { color: theme.textFaint, fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
-  title: { color: theme.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  subtitle: { color: theme.textDim, fontSize: 14, marginTop: -8 },
+  scrollContent: { padding: theme.pad, gap: 16, paddingBottom: 40 },
+  center: { alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14 },
+  chipRow: { flexDirection: 'row', gap: 8 },
+  chip: {
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  chipText: { color: theme.textDim, fontSize: 12, fontWeight: '600' },
+  subtitle: { color: theme.textDim, fontSize: 15, marginTop: -8 },
   primaryBtn: {
     backgroundColor: theme.accent,
     borderRadius: theme.radius,
-    paddingVertical: 16,
+    paddingVertical: 17,
     alignItems: 'center',
-    marginTop: 6,
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 440,
     alignSelf: 'center',
   },
   primaryBtnText: { color: theme.onAccent, fontSize: 17, fontWeight: '800' },
   readinessRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   readinessLabel: { color: theme.textFaint, fontSize: 13, marginRight: 4 },
   readinessBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 999,
     backgroundColor: theme.card,
     borderWidth: 1,
     borderColor: theme.border,
   },
-  readinessActive: { borderColor: theme.accent, backgroundColor: theme.cardRaised },
-  readinessEmoji: { fontSize: 14 },
+  readinessActive: { backgroundColor: theme.accent, borderColor: theme.accent },
   readinessText: { color: theme.textDim, fontSize: 13, fontWeight: '600' },
-  endEarly: { alignItems: 'center', paddingVertical: 12 },
-  endEarlyText: { color: theme.textFaint, fontSize: 13 },
-  prBig: { fontSize: 44 },
-  prSub: { color: theme.accent, fontSize: 16, fontWeight: '700' },
-  summaryTitle: { color: theme.text, fontSize: 22, fontWeight: '800' },
-  summaryReps: { color: theme.text, fontSize: 64, fontWeight: '200' },
+  linkBtn: { alignItems: 'center', paddingVertical: 10 },
+  linkText: { color: theme.textFaint, fontSize: 13 },
+  prEmoji: { fontSize: 40 },
+  prTitle: { color: theme.accent, fontSize: 18, fontWeight: '800' },
   summarySub: { color: theme.textDim, fontSize: 14 },
   effortBtn: {
     backgroundColor: theme.card,
     borderRadius: theme.radius,
     borderWidth: 1,
     borderColor: theme.border,
-    padding: 16,
+    padding: 18,
     alignItems: 'center',
   },
   effortLabel: { color: theme.text, fontSize: 17, fontWeight: '700' },

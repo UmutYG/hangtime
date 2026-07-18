@@ -69,6 +69,10 @@ export async function saveStore(store: Store): Promise<void> {
   await AsyncStorage.setItem(KEY, JSON.stringify(store));
 }
 
+export function stamp(store: Store): Store {
+  return { ...store, updatedAt: new Date().toISOString() };
+}
+
 export function exportJson(store: Store): string {
   return JSON.stringify(store, null, 2);
 }

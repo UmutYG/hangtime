@@ -163,6 +163,8 @@ export interface Store {
   prs: PR[];
   tests: TestPoint[];
   lifetimeReps: number;
+  /** last local mutation, ISO datetime — drives cloud-sync conflict resolution */
+  updatedAt?: string;
 }
 
 export interface ApplyOutcome {
