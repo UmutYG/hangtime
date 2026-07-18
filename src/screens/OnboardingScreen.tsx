@@ -20,12 +20,20 @@ export function OnboardingScreen() {
   const { createProfile } = useStore();
   const [bw, setBw] = useState('');
   const [max, setMax] = useState('19');
-  const [plate, setPlate] = useState<'1.25' | '2.5'>('1.25');
+  const [mode, setMode] = useState<'fixed' | 'adjustable'>('fixed');
+  const [vestKg, setVestKg] = useState('7.5');
   const [days, setDays] = useState<number[]>([0, 2, 4]); // Mon/Wed/Fri in display order
 
   const bwNum = parseFloat(bw);
   const maxNum = parseInt(max, 10);
-  const valid = bwNum > 30 && bwNum < 250 && maxNum >= 1 && maxNum <= 50 && days.length === 3;
+  const vestNum = parseFloat(vestKg);
+  const valid =
+    bwNum > 30 &&
+    bwNum < 250 &&
+    maxNum >= 1 &&
+    maxNum <= 50 &&
+    days.length === 3 &&
+    (mode === 'adjustable' || (vestNum > 0 && vestNum < 100));
 
   const toggleDay = (i: number) => {
     setDays((d) =>
@@ -38,7 +46,7 @@ export function OnboardingScreen() {
     createProfile({
       bodyweightKg: bwNum,
       startingMax: maxNum,
-      smallestPlateKg: plate === '1.25' ? 1.25 : 2.5,
+      equipment: { mode, fixedLoadKg: vestNum || 7.5, smallestPlateKg: 1.25 },
       trainingDays: days.map((i) => JS_DAY[i]),
       createdAt: new Date().toISOString().slice(0, 10),
     });
@@ -76,20 +84,36 @@ export function OnboardingScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.label}>Smallest plate you own</Text>
+          <Text style={styles.label}>Your weight setup</Text>
           <View style={styles.row}>
-            {(['1.25', '2.5'] as const).map((p) => (
-              <Pressable
-                key={p}
-                onPress={() => setPlate(p)}
-                style={[styles.chip, plate === p && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, plate === p && { color: theme.onAccent }]}>
-                  {p} kg
-                </Text>
-              </Pressable>
-            ))}
+            <Pressable
+              onPress={() => setMode('fixed')}
+              style={[styles.chip, mode === 'fixed' && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, mode === 'fixed' && { color: theme.onAccent }]}>
+                Fixed vest
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setMode('adjustable')}
+              style={[styles.chip, mode === 'adjustable' && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, mode === 'adjustable' && { color: theme.onAccent }]}>
+                Belt + plates
+              </Text>
+            </Pressable>
           </View>
+          {mode === 'fixed' ? (
+            <>
+              <Text style={styles.label}>Vest weight (kg) — measure it, you can correct later</Text>
+              <TextInput
+                value={vestKg}
+                onChangeText={setVestKg}
+                keyboardType="numeric"
+                style={styles.input}
+              />
+            </>
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -110,8 +134,9 @@ export function OnboardingScreen() {
         </View>
 
         <Text style={styles.note}>
-          Your first session calibrates the program: you'll work up to a comfortable heavy set with
-          the belt, and every number after that is computed for you.
+          {mode === 'fixed'
+            ? 'Your rep targets are estimated from your max, then the all-out last set of your first vest session tunes everything automatically.'
+            : "Your first session calibrates the program: you'll work up to a comfortable heavy set with the belt, and every number after that is computed for you."}
         </Text>
 
         <Pressable onPress={go} style={[styles.startBtn, !valid && { opacity: 0.4 }]}>

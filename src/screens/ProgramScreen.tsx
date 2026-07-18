@@ -16,6 +16,11 @@ import { theme, mono } from '../theme';
 
 const WEEK_LABELS = ['Build', 'Build', 'Build', 'Deload + Test'];
 
+const DAY_EXPLAINERS_FIXED = {
+  title: 'Day 1 · Vest',
+  body: 'Weighted pull-ups with your vest. The load is fixed, so the program progresses the other levers real programs use: reps per set first, then a 5th set, then shorter rests. Your all-out last set recalibrates the targets every session.',
+};
+
 const DAY_EXPLAINERS = [
   {
     title: 'Day 1 · Heavy',
@@ -40,6 +45,7 @@ export function ProgramScreen() {
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [bwText, setBwText] = useState('');
+  const [vestText, setVestText] = useState('');
 
   const profile = store.profile!;
   const s = store.state;
@@ -107,8 +113,18 @@ export function ProgramScreen() {
           {s.pendingDeload ? ' Early deload is queued — the program noticed accumulated fatigue.' : ''}
         </Text>
         <Text style={styles.cardBody}>
-          Current training load: <Text style={mono}>+{s.weighted.loadKg} kg</Text> · best max set:{' '}
-          <Text style={mono}>{s.bwBestMaxSet}</Text> reps
+          {profile.equipment.mode === 'fixed' ? (
+            <>
+              Vest: <Text style={mono}>+{profile.equipment.fixedLoadKg} kg</Text> ·{' '}
+              <Text style={mono}>{s.weighted.setCount}</Text> working sets ·{' '}
+              <Text style={mono}>{Math.round(s.weighted.restSec / 60)} min</Text> rests
+            </>
+          ) : (
+            <>
+              Current training load: <Text style={mono}>+{s.weighted.loadKg} kg</Text>
+            </>
+          )}
+          {' '}· best max set: <Text style={mono}>{s.bwBestMaxSet}</Text> reps
           {s.e1rmKg ? (
             <>
               {' '}· est. system 1RM: <Text style={mono}>{Math.round(s.e1rmKg)} kg</Text>
@@ -118,7 +134,10 @@ export function ProgramScreen() {
       </View>
 
       <Text style={styles.h2}>How it works</Text>
-      {DAY_EXPLAINERS.map((d) => (
+      {(profile.equipment.mode === 'fixed'
+        ? [DAY_EXPLAINERS_FIXED, ...DAY_EXPLAINERS.slice(1)]
+        : DAY_EXPLAINERS
+      ).map((d) => (
         <View key={d.title} style={styles.card}>
           <Text style={styles.cardTitle}>{d.title}</Text>
           <Text style={styles.cardBody}>{d.body}</Text>
@@ -161,6 +180,37 @@ export function ProgramScreen() {
           </Pressable>
         </View>
       </View>
+      {profile.equipment.mode === 'fixed' ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Vest weight: {profile.equipment.fixedLoadKg} kg</Text>
+          <View style={styles.rowGap}>
+            <TextInput
+              value={vestText}
+              onChangeText={setVestText}
+              placeholder="measured kg"
+              placeholderTextColor={theme.textFaint}
+              keyboardType="numeric"
+              style={styles.input}
+            />
+            <Pressable
+              onPress={() => {
+                const v = parseFloat(vestText);
+                if (v > 0 && v < 100) {
+                  updateProfile({ equipment: { ...profile.equipment, fixedLoadKg: v } });
+                  setVestText('');
+                }
+              }}
+              style={styles.smallBtn}
+            >
+              <Text style={styles.smallBtnText}>Save</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.cardBody}>
+            Measured your vest, or added weight to it? Update this — all targets re-derive
+            automatically.
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.rowGap}>
         <Pressable onPress={doExport} style={[styles.smallBtn, { flex: 1 }]}>

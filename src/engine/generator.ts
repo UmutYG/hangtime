@@ -9,16 +9,18 @@ import {
 } from './types';
 import * as C from './constants';
 import { buildWhy } from './explain';
-import { roundToIncrement } from './epley';
+import { e1rmSystem, repsAtLoad, roundToIncrement } from './epley';
 
 export function initialState(profile: Profile): ProgramState {
+  const fixed = profile.equipment.mode === 'fixed';
   return {
-    calibrated: false,
+    // fixed vest needs no load-finding session — the bodyweight max seeds everything
+    calibrated: fixed,
     cycle: 1,
     week: 1,
     sessionInWeek: 1,
     weighted: {
-      loadKg: 0,
+      loadKg: fixed ? profile.equipment.fixedLoadKg : 0,
       lastReps: [4, 4, 4, 4],
       failStreak: 0,
       grindStreak: 0,
@@ -26,13 +28,29 @@ export function initialState(profile: Profile): ProgramState {
       sessionsAtLoad: 0,
       microload: false,
       backoffNext: false,
+      setCount: C.FIXED_BASE_SETS,
+      restSec: C.HEAVY_REST_SEC,
+      suggestMoreLoad: false,
     },
     bwBestMaxSet: profile.startingMax,
     bwLastTestReps: profile.startingMax,
-    e1rmKg: null,
+    // conservative seed from the known bodyweight max
+    e1rmKg: fixed ? e1rmSystem(profile.bodyweightKg, 0, profile.startingMax) : null,
     pendingDeload: false,
     lastSessionDate: null,
   };
+}
+
+/** Per-set rep range for fixed-load work, self-tuned from the current e1RM estimate. */
+export function fixedRepRange(
+  profile: Profile,
+  state: ProgramState
+): { bottom: number; top: number } {
+  const e1rm =
+    state.e1rmKg ?? e1rmSystem(profile.bodyweightKg, 0, Math.max(5, state.bwBestMaxSet));
+  const est = repsAtLoad(e1rm, profile.bodyweightKg, profile.equipment.fixedLoadKg);
+  const top = C.FIXED_TOP_REPS(est);
+  return { bottom: Math.max(3, top - C.FIXED_REP_SPAN), top };
 }
 
 export function resolveDayKind(state: ProgramState): DayKind {
@@ -50,14 +68,15 @@ export function resolveDayKind(state: ProgramState): DayKind {
 
 const TITLES: Record<DayKind, string> = {
   calibration: 'Calibration — find your load',
-  heavy: 'Heavy Day — weighted pull-ups',
+  heavy: 'Vest Day — weighted pull-ups',
   volume: 'Volume Day — sub-max sets',
   max: 'Max Day — all-out sets',
   ladder: 'Ladder Day',
   deloadHeavy: 'Deload — light weighted',
   deloadVolume: 'Deload — easy volume',
   testBw: 'TEST — bodyweight max reps',
-  testWeighted: 'TEST — weighted 5RM',
+  testWeighted: 'TEST — vest max reps',
+  custom: 'Custom workout',
 };
 
 function warmupForLoad(loadKg: number, inc: number): PlannedSet[] {
@@ -84,7 +103,7 @@ export function generateSession(
   today: string,
   readiness?: Readiness
 ): SessionPlan {
-  const inc = profile.smallestPlateKg;
+  const inc = profile.equipment.smallestPlateKg;
   const dayKind = resolveDayKind(state);
   const decisions: Decision[] = [];
   let sets: PlannedSet[] = [];
@@ -114,6 +133,42 @@ export function generateSession(
       break;
     }
     case 'heavy': {
+      if (profile.equipment.mode === 'fixed') {
+        // Fixed vest: load never changes — progress through reps, then a 5th set, then density.
+        const load = profile.equipment.fixedLoadKg;
+        const range = fixedRepRange(profile, state);
+        const isFirst = state.lastSessionDate === null;
+        let nSets = rough ? Math.max(3, w.setCount - 1) : w.setCount;
+        const targets = w.lastReps.slice(0, nSets).map((r) => Math.min(range.top, Math.max(range.bottom, r)));
+        while (targets.length < nSets) targets.push(range.bottom);
+        sets = [
+          { targetReps: 5, loadKg: 0, isWarmup: true, restSecAfter: 60 },
+          { targetReps: 3, loadKg: 0, isWarmup: true, restSecAfter: 90 },
+          ...targets.map((t, i): PlannedSet => {
+            const last = i === nSets - 1;
+            return {
+              targetReps: t,
+              loadKg: load,
+              amrap: last,
+              restSecAfter: last ? 0 : w.restSec,
+              note: last ? 'Last set: max clean reps — this recalibrates your targets.' : undefined,
+            };
+          }),
+        ];
+        if (isFirst) decisions.push({ code: 'FIRST_VEST_SESSION', params: { load, top: range.top } });
+        else if (w.suggestMoreLoad) decisions.push({ code: 'SUGGEST_MORE_LOAD', params: { load } });
+        else if (w.restSec < C.HEAVY_REST_SEC)
+          decisions.push({ code: 'DENSITY_UP', params: { rest: w.restSec, load } });
+        else if (w.setCount > C.FIXED_BASE_SETS)
+          decisions.push({ code: 'ADD_SET', params: { sets: nSets, load } });
+        else if (w.failStreak > 0) decisions.push({ code: 'REPEAT_AFTER_FAIL', params: { load } });
+        else
+          decisions.push({
+            code: 'VEST_FILL_REPS',
+            params: { load, bottom: range.bottom, top: range.top },
+          });
+        break;
+      }
       const load = roundToIncrement(w.loadKg * loadFactor, inc);
       // Per-set targets carry over from last time at this load (double progression fills reps).
       const nSets = rough ? C.HEAVY_SETS - 1 : C.HEAVY_SETS;
@@ -209,15 +264,29 @@ export function generateSession(
         code: state.pendingDeload ? 'DELOAD_TRIGGERED' : 'DELOAD_SCHEDULED',
         params: {},
       });
-      const load = roundToIncrement(w.loadKg * C.DELOAD_LOAD_FACTOR, inc);
-      sets = [
-        ...warmupForLoad(load, inc),
-        ...Array.from({ length: C.DELOAD_HEAVY_SETS }, (_, i) => ({
-          targetReps: C.DELOAD_HEAVY_REPS,
-          loadKg: load,
-          restSecAfter: i === C.DELOAD_HEAVY_SETS - 1 ? 0 : C.HEAVY_REST_SEC,
-        })),
-      ];
+      if (profile.equipment.mode === 'fixed') {
+        // can't lighten a fixed vest — deload = fewer, easier sets at the same load
+        const load = profile.equipment.fixedLoadKg;
+        const reps = Math.max(3, fixedRepRange(profile, state).bottom - 1);
+        sets = [
+          { targetReps: 5, loadKg: 0, isWarmup: true, restSecAfter: 90 },
+          ...Array.from({ length: C.DELOAD_HEAVY_SETS }, (_, i) => ({
+            targetReps: reps,
+            loadKg: load,
+            restSecAfter: i === C.DELOAD_HEAVY_SETS - 1 ? 0 : C.HEAVY_REST_SEC,
+          })),
+        ];
+      } else {
+        const load = roundToIncrement(w.loadKg * C.DELOAD_LOAD_FACTOR, inc);
+        sets = [
+          ...warmupForLoad(load, inc),
+          ...Array.from({ length: C.DELOAD_HEAVY_SETS }, (_, i) => ({
+            targetReps: C.DELOAD_HEAVY_REPS,
+            loadKg: load,
+            restSecAfter: i === C.DELOAD_HEAVY_SETS - 1 ? 0 : C.HEAVY_REST_SEC,
+          })),
+        ];
+      }
       progressionExempt = true;
       break;
     }
@@ -252,6 +321,21 @@ export function generateSession(
     }
     case 'testWeighted': {
       decisions.push({ code: 'TEST_WEIGHTED', params: {} });
+      if (profile.equipment.mode === 'fixed') {
+        const load = profile.equipment.fixedLoadKg;
+        sets = [
+          { targetReps: 5, loadKg: 0, isWarmup: true, restSecAfter: 90 },
+          { targetReps: 3, loadKg: load, isWarmup: true, restSecAfter: 180 },
+          {
+            targetReps: fixedRepRange(profile, state).top + 2,
+            loadKg: load,
+            amrap: true,
+            restSecAfter: 0,
+            note: 'One all-out set with the vest, strict form. This resets your strength estimate.',
+          },
+        ];
+        break;
+      }
       const load = roundToIncrement(w.loadKg, inc);
       sets = [
         ...warmupForLoad(Math.max(load, 5), inc),
@@ -267,18 +351,25 @@ export function generateSession(
       ];
       break;
     }
+    case 'custom':
+      break; // never generated — custom sessions are logged directly
   }
 
   if (layoff) decisions.push({ code: 'LAYOFF_RAMP', params: { days: layoffDays } });
   if (rough) decisions.push({ code: 'READINESS_TRIM', params: {} });
 
   const { why, whyDetail } = buildWhy(decisions);
+  let title = TITLES[dayKind];
+  if (profile.equipment.mode === 'adjustable') {
+    if (dayKind === 'heavy') title = 'Heavy Day — weighted pull-ups';
+    if (dayKind === 'testWeighted') title = 'TEST — weighted 5RM';
+  }
   return {
     dayKind,
     cycle: state.cycle,
     week: state.week,
     sessionInWeek: state.sessionInWeek,
-    title: TITLES[dayKind],
+    title,
     sets,
     decisions,
     why,

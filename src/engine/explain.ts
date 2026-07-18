@@ -12,6 +12,16 @@ export function explainShort(d: Decision): string {
   switch (d.code) {
     case 'CALIBRATION':
       return `First weighted session: we find your working load today. Work up in sets of 3 until it feels like an 8/10 effort, then one all-out set.`;
+    case 'FIRST_VEST_SESSION':
+      return `First vest session. Targets are estimated from your bodyweight max — the all-out last set tells the program what the vest is really worth, and every number recalibrates from there.`;
+    case 'VEST_FILL_REPS':
+      return `Same vest (+${fmt(Number(p.load))}), sets of ${p.bottom}–${p.top}. Add a rep anywhere. When every set tops out, the program makes the day harder — more sets, then shorter rests.`;
+    case 'ADD_SET':
+      return `You topped every set, and the vest can't get heavier — so today has ${p.sets} sets instead of 4. Volume is the lever when load is fixed.`;
+    case 'DENSITY_UP':
+      return `All 5 sets topped out — next lever: rests drop to ${Math.round(Number(p.rest) / 60)} min. Same work, less time. Density is how you progress a fixed load.`;
+    case 'SUGGEST_MORE_LOAD':
+      return `You've outgrown this vest: 5 dense sets, all topped. The honest next step is more weight — until then, targets keep rising with your strength estimate.`;
     case 'LOAD_UP':
       return `You hit ${p.reps} @ +${fmt(Number(p.prevLoad))} — top of the range with reps to spare. The belt gets +${fmt(Number(p.increment))} and we rebuild from 4s.`;
     case 'LOAD_UP_MICRO':
@@ -51,6 +61,13 @@ export function explainDetail(d: Decision): string {
   switch (d.code) {
     case 'CALIBRATION':
       return `The load you find today seeds "double progression": we keep the load fixed and grow your reps from 4s to 6s across 4 sets. When every set hits 6 with a rep in reserve, the load goes up and reps reset to 4. Load follows reps — that's the engine.`;
+    case 'FIRST_VEST_SESSION':
+    case 'VEST_FILL_REPS':
+    case 'ADD_SET':
+    case 'DENSITY_UP':
+      return `With a fixed load, real programs progress along three levers in order: reps per set, then total sets, then rest density. Your rep targets are re-derived from your strength estimate after every all-out set, so the day always sits ~2 reps shy of your max — hard enough to grow, never a grind.`;
+    case 'SUGGEST_MORE_LOAD':
+      return `Research consensus: once a load allows 10–12+ crisp reps per set across 5 dense sets, adding weight beats adding more volume. A heavier vest or a dip belt with plates re-opens the strength lever; the program adapts to whatever load you tell it in Settings.`;
     case 'LOAD_UP':
     case 'LOAD_UP_MICRO':
       return `Double progression: reps grow first, then load. Resetting to 4s after a load increase keeps every rep clean and keeps you 1–2 reps shy of failure, which research on strength training shows drives progress with far less fatigue than grinding.`;

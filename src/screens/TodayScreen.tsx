@@ -7,6 +7,7 @@ import { theme, mono } from '../theme';
 import { WhyCard } from '../components/WhyCard';
 import { SetRow } from '../components/SetRow';
 import { RestTimer } from '../components/RestTimer';
+import { ManualLog } from '../components/ManualLog';
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -27,7 +28,7 @@ const EFFORTS: Array<{ key: Effort; label: string; hint: string }> = [
 export function TodayScreen() {
   const { store, completeSession } = useStore();
   const [readiness, setReadiness] = useState<Readiness | undefined>();
-  const [phase, setPhase] = useState<'idle' | 'active' | 'effort' | 'summary'>('idle');
+  const [phase, setPhase] = useState<'idle' | 'active' | 'effort' | 'summary' | 'manual'>('idle');
   const [actuals, setActuals] = useState<(number | null)[]>([]);
   const [cursor, setCursor] = useState(0);
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
@@ -115,6 +116,21 @@ export function TodayScreen() {
     monday.setHours(0, 0, 0, 0);
     return d >= monday;
   }).length;
+
+  if (phase === 'manual') {
+    return (
+      <ManualLog
+        defaultLoadKg={profile.equipment.fixedLoadKg}
+        onCancel={resetToIdle}
+        onSave={(session) => {
+          const reps = session.sets.reduce((sum, s) => sum + s.actualReps, 0);
+          const { prCount } = completeSession(session);
+          setSummary({ reps, prCount });
+          setPhase('summary');
+        }}
+      />
+    );
+  }
 
   if (phase === 'summary' && summary) {
     return (
@@ -237,6 +253,9 @@ export function TodayScreen() {
       </View>
       <Pressable onPress={start} style={styles.primaryBtn}>
         <Text style={styles.primaryBtnText}>Start session</Text>
+      </Pressable>
+      <Pressable onPress={() => setPhase('manual')} style={styles.endEarly}>
+        <Text style={styles.endEarlyText}>Log a workout you did on your own</Text>
       </Pressable>
     </ScrollView>
   );

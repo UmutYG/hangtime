@@ -16,9 +16,15 @@ import {
 const profile: Profile = {
   bodyweightKg: 80,
   startingMax: 19,
-  smallestPlateKg: 1.25,
+  equipment: { mode: 'adjustable', fixedLoadKg: 7.5, smallestPlateKg: 1.25 },
   trainingDays: [1, 3, 5],
   createdAt: '2026-07-20',
+};
+
+const vestProfile: Profile = {
+  ...profile,
+  bodyweightKg: 82,
+  equipment: { mode: 'fixed', fixedLoadKg: 7.5, smallestPlateKg: 1.25 },
 };
 
 let dayCounter = 0;
@@ -330,6 +336,94 @@ describe('readiness & layoff', () => {
     expect(plan.decisions.some((d) => d.code === 'LAYOFF_RAMP')).toBe(true);
     const working = plan.sets.filter((s) => !s.isWarmup);
     expect(working[0].loadKg).toBeLessThan(20);
+  });
+});
+
+describe('fixed-vest mode', () => {
+  it('skips calibration and starts on a vest heavy day with sane targets', () => {
+    const state = initialState(vestProfile);
+    expect(state.calibrated).toBe(true);
+    expect(state.e1rmKg).not.toBeNull();
+    const plan = generateSession(vestProfile, state, '2026-07-20');
+    expect(plan.dayKind).toBe('heavy');
+    expect(plan.decisions[0].code).toBe('FIRST_VEST_SESSION');
+    const working = plan.sets.filter((s) => !s.isWarmup);
+    expect(working).toHaveLength(4);
+    // every working set uses exactly the vest load
+    working.forEach((s) => expect(s.loadKg).toBe(7.5));
+    // 19 BW max @82kg → e1rm ~133.9 → est vest reps ~14.5 → top 12 (capped), bottom 9
+    expect(working[0].targetReps).toBeGreaterThanOrEqual(8);
+    expect(working[0].targetReps).toBeLessThanOrEqual(12);
+    expect(plan.sets[plan.sets.length - 1].amrap).toBe(true);
+  });
+
+  it('progression ladder: all-topped → 5th set → denser rests → suggest more load', () => {
+    let state = initialState(vestProfile);
+    const runTopped = () => {
+      const date = nextDate();
+      const plan = generateSession(vestProfile, state, date);
+      const log = logPerfect(plan, date, { effort: 'right' });
+      // top every working set (targets clamp at range top = 12)
+      log.sets.forEach((s) => {
+        if (!s.isWarmup) s.actualReps = 12;
+      });
+      const out = applyResult(vestProfile, state, log, []);
+      state = { ...out.state, week: 1, sessionInWeek: 1, lastSessionDate: date };
+    };
+    runTopped();
+    expect(state.weighted.setCount).toBe(5);
+    runTopped();
+    expect(state.weighted.restSec).toBe(120);
+    runTopped();
+    expect(state.weighted.suggestMoreLoad).toBe(true);
+    const plan = generateSession(vestProfile, state, nextDate());
+    expect(plan.decisions[0].code).toBe('SUGGEST_MORE_LOAD');
+    expect(plan.sets.filter((s) => !s.isWarmup)).toHaveLength(5);
+  });
+
+  it('vest AMRAP raises e1RM and with it the next rep targets', () => {
+    let state = initialState(vestProfile);
+    const before = state.e1rmKg!;
+    const date = nextDate();
+    const plan = generateSession(vestProfile, state, date);
+    const log = logPerfect(plan, date, { effort: 'right' });
+    const working = log.sets.filter((s) => !s.isWarmup);
+    working.forEach((s, i) => (s.actualReps = Math.min(s.targetReps, 10)));
+    working[working.length - 1].actualReps = 16; // monster AMRAP
+    const out = applyResult(vestProfile, state, log, []);
+    expect(out.state.e1rmKg!).toBeGreaterThan(before);
+  });
+
+  it('custom manual log updates estimates but never advances the cycle', () => {
+    const state = initialState(vestProfile);
+    const log = {
+      id: 'manual-1',
+      date: '2026-07-20',
+      dayKind: 'custom' as const,
+      cycle: 0,
+      week: 0,
+      sets: [
+        { targetReps: 17, actualReps: 17, loadKg: 7.5 }, // e1RM 140.2 > seed 133.9
+        { targetReps: 21, actualReps: 21, loadKg: 0 },
+      ],
+    };
+    const out = applyResult(vestProfile, state, log, []);
+    expect(out.state.sessionInWeek).toBe(1); // no advance
+    expect(out.state.week).toBe(1);
+    expect(out.state.bwBestMaxSet).toBe(21);
+    expect(out.state.e1rmKg!).toBeGreaterThan(initialState(vestProfile).e1rmKg!);
+    expect(out.repsDone).toBe(38);
+  });
+
+  it('fixed-mode weighted test recalibrates targets without touching the load', () => {
+    let state = { ...initialState(vestProfile), cycle: 2, week: 4 as const, sessionInWeek: 3 as const };
+    const date = nextDate();
+    const plan = generateSession(vestProfile, state, date);
+    expect(plan.dayKind).toBe('testWeighted');
+    const log = logPerfect(plan, date, { amrapReps: 15 });
+    const out = applyResult(vestProfile, state, log, []);
+    expect(out.state.weighted.loadKg).toBe(7.5);
+    expect(out.state.e1rmKg).toBeCloseTo(e1rmSystem(82, 7.5, 15), 1);
   });
 });
 

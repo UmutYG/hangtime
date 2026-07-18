@@ -8,6 +8,46 @@ import {
 } from './types';
 import * as C from './constants';
 import { addedLoadForReps, e1rmSystem, roundToIncrement } from './epley';
+import { fixedRepRange } from './generator';
+
+/** Fixed-vest heavy day: progress reps → add a 5th set → shorten rests → advise more load. */
+function applyFixedHeavy(
+  profile: Profile,
+  prevState: ProgramState,
+  state: ProgramState,
+  session: LoggedSession
+): void {
+  const w = state.weighted;
+  const range = fixedRepRange(profile, state);
+  const working = session.sets.filter((s) => !s.isWarmup && s.loadKg > 0);
+  const reps = working.map((s) => s.actualReps);
+  const grind = session.lastSetEffort === 'grind';
+  const anyCollapse = reps.some((r) => r < range.bottom - 1);
+  const allTop = reps.length > 0 && reps.every((r) => r >= range.top);
+
+  if (allTop && !grind) {
+    if (w.setCount < C.FIXED_MAX_SETS) w.setCount += 1;
+    else if (w.restSec > C.FIXED_DENSE_REST_SEC) w.restSec = C.FIXED_DENSE_REST_SEC;
+    else w.suggestMoreLoad = true;
+    w.lastReps = Array(w.setCount).fill(range.bottom);
+    w.failStreak = 0;
+  } else if (anyCollapse) {
+    w.failStreak += 1;
+    if (w.failStreak >= C.FAILS_FOR_DELOAD) {
+      state.pendingDeload = true;
+      w.failStreak = 0;
+    }
+  } else {
+    w.lastReps = reps.map((r) => Math.min(range.top, Math.max(range.bottom, r)));
+    while (w.lastReps.length < w.setCount) w.lastReps.push(range.bottom);
+    w.failStreak = 0;
+  }
+  w.grindStreak = grind ? w.grindStreak + 1 : 0;
+  if (w.grindStreak >= C.GRINDS_FOR_DELOAD) {
+    state.pendingDeload = true;
+    w.grindStreak = 0;
+  }
+}
 
 function advance(state: ProgramState): ProgramState {
   let { cycle, week, sessionInWeek } = state;
@@ -60,7 +100,7 @@ export function applyResult(
   session: LoggedSession,
   existingPrs: PR[]
 ): ApplyOutcome {
-  const inc = profile.smallestPlateKg;
+  const inc = profile.equipment.smallestPlateKg;
   let state: ProgramState = {
     ...prevState,
     weighted: { ...prevState.weighted },
@@ -109,7 +149,18 @@ export function applyResult(
       break;
     }
     case 'heavy': {
+      // live e1RM from any weighted set (AMRAP last set usually) — runs even when exempt
+      const liveBest = bestWeightedSet(session, profile.bodyweightKg);
+      if (liveBest && liveBest.loadKg > 0) {
+        const e1rm = e1rmSystem(profile.bodyweightKg, liveBest.loadKg, liveBest.reps);
+        if (state.e1rmKg === null || e1rm > state.e1rmKg) state.e1rmKg = e1rm;
+        recordE1rmPr(e1rm);
+      }
       if (exempt) break;
+      if (profile.equipment.mode === 'fixed') {
+        applyFixedHeavy(profile, prevState, state, session);
+        break;
+      }
       const w = state.weighted;
       const working = session.sets.filter((s) => !s.isWarmup);
       const mainSets = working.filter((s) => s.loadKg >= w.loadKg - 0.01); // excludes back-off set
@@ -155,14 +206,22 @@ export function applyResult(
         state.pendingDeload = true;
         w.grindStreak = 0;
       }
-      // live e1RM from best working set (AMRAP last set usually)
-      const best = bestWeightedSet(session, profile.bodyweightKg);
-      if (best && best.loadKg > 0) {
-        const e1rm = e1rmSystem(profile.bodyweightKg, best.loadKg, best.reps);
+      break;
+    }
+    case 'custom': {
+      // manual log: feeds every estimate, never advances the cycle
+      const bestW = bestWeightedSet(session, profile.bodyweightKg);
+      if (bestW && bestW.loadKg > 0) {
+        const e1rm = e1rmSystem(profile.bodyweightKg, bestW.loadKg, bestW.reps);
         if (state.e1rmKg === null || e1rm > state.e1rmKg) state.e1rmKg = e1rm;
         recordE1rmPr(e1rm);
       }
-      break;
+      const bestBw = bestBwSet(session);
+      if (bestBw > state.bwBestMaxSet) {
+        state.bwBestMaxSet = bestBw;
+        recordBwPr(bestBw);
+      }
+      return { state, newPrs, newTests, repsDone }; // no advance()
     }
     case 'volume':
     case 'deloadVolume':
@@ -195,6 +254,18 @@ export function applyResult(
         state.e1rmKg = e1rm;
         recordE1rmPr(e1rm);
         newTests.push({ quality: 'weighted', value: e1rm, date: session.date });
+        if (profile.equipment.mode === 'fixed') {
+          // load is what it is — the test just recalibrates rep targets
+          const range = fixedRepRange(profile, state);
+          state.weighted = {
+            ...state.weighted,
+            lastReps: Array(state.weighted.setCount).fill(range.bottom),
+            failStreak: 0,
+            grindStreak: 0,
+            backoffNext: false,
+          };
+          break;
+        }
         // re-seed working load for the next block: a load allowing ~7 clean reps.
         // Never below the current working load — a test can only move you up.
         const working = Math.max(

@@ -11,15 +11,24 @@ export type DayKind =
   | 'deloadHeavy'
   | 'deloadVolume'
   | 'testBw'
-  | 'testWeighted';
+  | 'testWeighted'
+  | 'custom'; // manually logged workout — feeds stats, never advances the cycle
 
 export type Readiness = 'good' | 'ok' | 'rough';
 export type Effort = 'easy' | 'right' | 'grind';
 
+export interface Equipment {
+  /** 'fixed' = a vest/plate of one set weight (progress via reps→sets→density);
+   *  'adjustable' = belt with plates (progress via load). */
+  mode: 'fixed' | 'adjustable';
+  fixedLoadKg: number; // used in fixed mode
+  smallestPlateKg: number; // used in adjustable mode
+}
+
 export interface Profile {
   bodyweightKg: number;
   startingMax: number;
-  smallestPlateKg: number;
+  equipment: Equipment;
   trainingDays: number[]; // weekday indices 0=Sun..6=Sat, length 3
   createdAt: ISODate;
 }
@@ -37,9 +46,14 @@ export interface PlannedSet {
 
 export type ReasonCode =
   | 'CALIBRATION'
+  | 'FIRST_VEST_SESSION'
   | 'LOAD_UP'
   | 'LOAD_UP_MICRO'
   | 'HOLD_FILL_REPS'
+  | 'VEST_FILL_REPS'
+  | 'ADD_SET'
+  | 'DENSITY_UP'
+  | 'SUGGEST_MORE_LOAD'
   | 'REPEAT_AFTER_FAIL'
   | 'BACKOFF_SET'
   | 'DELOAD_SCHEDULED'
@@ -100,6 +114,10 @@ export interface WeightedState {
   sessionsAtLoad: number;
   microload: boolean;
   backoffNext: boolean;
+  /** fixed-load progression ladder: reps fill → extra set → shorter rests → "add load" advice */
+  setCount: number;
+  restSec: number;
+  suggestMoreLoad: boolean;
 }
 
 export interface ProgramState {

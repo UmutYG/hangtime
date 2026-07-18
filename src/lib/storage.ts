@@ -21,6 +21,9 @@ export function emptyStore(): Store {
         sessionsAtLoad: 0,
         microload: false,
         backoffNext: false,
+        setCount: 4,
+        restSec: 180,
+        suggestMoreLoad: false,
       },
       bwBestMaxSet: 0,
       bwLastTestReps: 0,
@@ -38,8 +41,18 @@ export function emptyStore(): Store {
 export function migrate(raw: unknown): Store {
   const s = raw as Partial<Store> | null;
   if (!s || typeof s !== 'object' || s.version !== 1) return emptyStore();
-  // future migrations step version by version here
-  return { ...emptyStore(), ...s } as Store;
+  const merged = { ...emptyStore(), ...s } as Store;
+  // pre-equipment profiles carried smallestPlateKg at the top level
+  const p = merged.profile as (Store['profile'] & { smallestPlateKg?: number }) | null;
+  if (p && !p.equipment) {
+    p.equipment = {
+      mode: 'adjustable',
+      fixedLoadKg: 7.5,
+      smallestPlateKg: p.smallestPlateKg ?? 1.25,
+    };
+  }
+  merged.state.weighted = { ...emptyStore().state.weighted, ...merged.state.weighted };
+  return merged;
 }
 
 export async function loadStore(): Promise<Store> {

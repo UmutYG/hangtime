@@ -6,6 +6,16 @@ export const HEAVY_REST_SEC = 180;
 export const HEAVY_AMRAP_CAP = 8;
 export const LOAD_INCREMENT_KG = 2.5;
 
+// Fixed-load (vest) progression: reps fill → 5th set → denser rests → "add load" advice.
+// This is how real programs progress a load you cannot change (rep-goal + density methods).
+export const FIXED_BASE_SETS = 4;
+export const FIXED_MAX_SETS = 5;
+export const FIXED_DENSE_REST_SEC = 120;
+export const FIXED_REP_SPAN = 3; // bottom of range = top − span
+/** top of per-set range: est. max reps at that load minus ~2 RIR, kept sane */
+export const FIXED_TOP_REPS = (estMaxReps: number) =>
+  Math.min(12, Math.max(5, Math.round(estMaxReps) - 2));
+
 export const VOLUME_SETS = 10;
 export const VOLUME_SETS_ROUGH = 8;
 export const VOLUME_PCT_OF_MAX = 0.5; // K Boges: 50 % of best max-effort set

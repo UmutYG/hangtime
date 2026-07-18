@@ -11,6 +11,12 @@ export function addedLoadForReps(e1rmKg: number, bodyweightKg: number, reps: num
   return Math.max(0, system - bodyweightKg);
 }
 
+/** Estimated max reps at a given added load, from a system-weight e1RM. */
+export function repsAtLoad(e1rmKg: number, bodyweightKg: number, addedKg: number): number {
+  const system = bodyweightKg + addedKg;
+  return Math.max(1, 30 * (e1rmKg / system - 1));
+}
+
 export function roundToIncrement(kg: number, incrementKg: number): number {
   return Math.round(kg / incrementKg) * incrementKg;
 }

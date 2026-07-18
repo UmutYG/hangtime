@@ -20,21 +20,9 @@
       },
       "predictiveBackGestureEnabled": false
     },
-    "web": {
-      "bundler": "metro",
-      "output": "single",
-      "themeColor": "#0C0C0E",
-      "backgroundColor": "#0C0C0E",
-      "name": "Hangtime",
-      "shortName": "Hangtime",
-      "description": "Pull-ups. Auto-planned. Explained."
-    },
     "backgroundColor": "#0C0C0E",
     "splash": {
       "backgroundColor": "#0C0C0E"
-    },
-    "experiments": {
-      "baseUrl": "/hangtime"
     }
   }
 }
