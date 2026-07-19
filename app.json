@@ -8,7 +8,7 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "com.umutyg.hangtime",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "supportsTablet": false
     },
     "android": {
