@@ -58,7 +58,7 @@ export function OnboardingScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.logo}>HANGTIME</Text>
+        <Text style={styles.logo}>Hangtime</Text>
         <Text style={styles.tag}>Pull-ups. Auto-planned. Explained.</Text>
 
         <View style={styles.card}>
@@ -148,20 +148,20 @@ export function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 24, gap: 14, paddingTop: 28, paddingBottom: 50, maxWidth: 480, width: '100%', alignSelf: 'center' },
-  logo: { color: theme.accent, fontSize: 30, fontWeight: '900', letterSpacing: 4 },
-  tag: { color: theme.textDim, fontSize: 14, marginTop: -8, marginBottom: 10 },
+  content: { padding: 24, gap: 14, paddingTop: 60, paddingBottom: 50, maxWidth: 480, width: '100%', alignSelf: 'center' },
+  logo: { color: theme.text, fontSize: 30, fontWeight: '700', letterSpacing: -0.8 },
+  tag: { color: theme.textFaint, fontSize: 14, marginTop: -8, marginBottom: 10 },
   card: {
     backgroundColor: theme.card,
-    borderRadius: theme.radius,
+    borderRadius: theme.radiusLg,
     borderWidth: 1,
     borderColor: theme.border,
-    padding: 14,
+    padding: 16,
     gap: 10,
   },
   label: { color: theme.textDim, fontSize: 13, fontWeight: '600' },
   input: {
-    backgroundColor: theme.cardRaised,
+    backgroundColor: theme.cardMuted,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: theme.border,
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: theme.cardRaised,
+    backgroundColor: theme.cardMuted,
     borderWidth: 1,
     borderColor: theme.border,
   },
@@ -185,10 +185,10 @@ const styles = StyleSheet.create({
   note: { color: theme.textFaint, fontSize: 13, lineHeight: 19 },
   startBtn: {
     backgroundColor: theme.accent,
-    borderRadius: theme.radius,
+    borderRadius: 999,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 6,
   },
-  startText: { color: theme.onAccent, fontSize: 17, fontWeight: '800' },
+  startText: { color: theme.onAccent, fontSize: 17, fontWeight: '700' },
 });

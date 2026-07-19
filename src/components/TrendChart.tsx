@@ -75,7 +75,7 @@ export function TrendChart({
           cx={x(new Date(p.date).getTime())}
           cy={y(p.value)}
           r={3.5}
-          fill={i === points.length - 1 ? theme.accent : theme.bg}
+          fill={i === points.length - 1 ? theme.accent : theme.card}
           stroke={theme.accent}
           strokeWidth={2}
         />

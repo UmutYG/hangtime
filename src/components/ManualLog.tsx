@@ -1,26 +1,29 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LoggedSession } from '../engine/types';
 import { theme, mono } from '../theme';
+import { Sheet } from './Sheet';
 
 interface Row {
   reps: string;
   loadKg: string;
 }
 
-// Log a workout done outside the app (e.g. today's own session).
-// Feeds the algorithm's estimates; never advances the program schedule.
+// Log a workout done outside the app, or edit a past one. Feeds the
+// algorithm's estimates; a fresh log never advances the program schedule.
 export function ManualLog({
+  visible,
   defaultLoadKg,
   initial,
+  onClose,
   onSave,
-  onCancel,
 }: {
+  visible: boolean;
   defaultLoadKg: number;
   /** pass an existing session to edit it instead of creating a new one */
   initial?: LoggedSession;
+  onClose: () => void;
   onSave: (session: LoggedSession) => void;
-  onCancel: () => void;
 }) {
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
   const [rows, setRows] = useState<Row[]>(
@@ -43,26 +46,29 @@ export function ManualLog({
     if (!valid) return;
     onSave({
       id: initial?.id ?? `manual-${date}-${Math.random().toString(36).slice(2, 8)}`,
-      dayKind: initial?.dayKind ?? 'custom',
-      cycle: initial?.cycle ?? 0,
-      week: initial?.week ?? 0,
-      readiness: initial?.readiness,
-      lastSetEffort: initial?.lastSetEffort,
-      progressionExempt: initial?.progressionExempt,
       date,
+      dayKind: 'custom',
+      cycle: 0,
+      week: 0,
       sets: parsed.map((r) => ({ targetReps: r.reps, actualReps: r.reps, loadKg: r.loadKg })),
     });
+    if (!initial) {
+      setDate(new Date().toISOString().slice(0, 10));
+      setRows([{ reps: '', loadKg: '0' }]);
+    }
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>{initial ? 'Edit workout' : 'Log your own workout'}</Text>
-      <Text style={styles.sub}>
-        {initial
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={initial ? 'Edit workout' : 'Log a session'}
+      subtitle={
+        initial
           ? 'Changing sets recalculates all your stats and estimates.'
-          : "Counts toward your stats and tunes the program's estimates. It won't replace a planned session."}
-      </Text>
-
+          : "Done outside the app — it still feeds the engine. Won't replace a planned session."
+      }
+    >
       <View style={styles.card}>
         <Text style={styles.label}>Date</Text>
         <TextInput
@@ -119,31 +125,25 @@ export function ManualLog({
       </View>
 
       <Pressable onPress={save} style={[styles.primaryBtn, !valid && { opacity: 0.4 }]}>
-        <Text style={styles.primaryBtnText}>Save workout</Text>
+        <Text style={styles.primaryBtnText}>{initial ? 'Save changes' : 'Save to history'}</Text>
       </Pressable>
-      <Pressable onPress={onCancel} style={styles.cancel}>
-        <Text style={styles.cancelText}>Cancel</Text>
-      </Pressable>
-    </ScrollView>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.bg },
-  content: { padding: theme.pad, gap: 12, paddingBottom: 40 },
-  title: { color: theme.text, fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
-  sub: { color: theme.textDim, fontSize: 13, lineHeight: 19, marginTop: -6 },
   card: {
     backgroundColor: theme.card,
-    borderRadius: theme.radius,
+    borderRadius: theme.radiusLg,
     borderWidth: 1,
     borderColor: theme.border,
     padding: 14,
     gap: 10,
+    marginBottom: 12,
   },
   label: { color: theme.textDim, fontSize: 13, fontWeight: '600' },
   input: {
-    backgroundColor: theme.cardRaised,
+    backgroundColor: theme.cardMuted,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: theme.border,
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   remove: { color: theme.danger, fontSize: 16, paddingHorizontal: 4 },
   rowBtns: { flexDirection: 'row', gap: 8 },
   smallBtn: {
-    backgroundColor: theme.cardRaised,
+    backgroundColor: theme.cardMuted,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: theme.border,
@@ -167,11 +167,10 @@ const styles = StyleSheet.create({
   smallBtnText: { color: theme.text, fontSize: 13, fontWeight: '600' },
   primaryBtn: {
     backgroundColor: theme.accent,
-    borderRadius: theme.radius,
-    paddingVertical: 15,
+    borderRadius: 999,
+    paddingVertical: 16,
     alignItems: 'center',
+    marginTop: 4,
   },
-  primaryBtnText: { color: theme.onAccent, fontSize: 16, fontWeight: '800' },
-  cancel: { alignItems: 'center', paddingVertical: 10 },
-  cancelText: { color: theme.textFaint, fontSize: 13 },
+  primaryBtnText: { color: theme.onAccent, fontSize: 16, fontWeight: '700' },
 });

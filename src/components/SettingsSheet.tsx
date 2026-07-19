@@ -1,23 +1,9 @@
 import React, { useState } from 'react';
-import {
-  Alert,
-  Platform,
-  Pressable,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useStore } from '../hooks/useStore';
 import { exportJson } from '../lib/storage';
 import { theme, mono } from '../theme';
-
-const WEEK_LABELS = ['Build', 'Build', 'Build', 'Deload + Test'];
-
-// Program education lives contextually in each session's "why" card —
-// this screen only answers "where am I" and holds settings.
+import { Sheet } from './Sheet';
 
 const SYNC_LABEL: Record<string, string> = {
   unavailable: 'iCloud unavailable — works after the TestFlight build (not in Expo Go)',
@@ -26,10 +12,16 @@ const SYNC_LABEL: Record<string, string> = {
   synced: 'iCloud — synced',
   error: 'iCloud — sync failed, will retry on next change',
 };
+const SYNC_DOT: Record<string, string> = {
+  unavailable: theme.textFaint,
+  idle: theme.textFaint,
+  syncing: theme.warn,
+  synced: theme.good,
+  error: theme.danger,
+};
 
-export function ProgramScreen() {
-  const { store, updateProfile, importStore, resetAll, syncState, lastSyncedAt, syncNow } =
-    useStore();
+export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { store, updateProfile, importStore, resetAll, syncState } = useStore();
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [bwText, setBwText] = useState('');
@@ -49,6 +41,7 @@ export function ProgramScreen() {
       a.click();
       URL.revokeObjectURL(url);
     } else {
+      const { Share } = await import('react-native');
       await Share.share({ message: json });
     }
   };
@@ -65,7 +58,10 @@ export function ProgramScreen() {
   };
 
   const doReset = () => {
-    const go = () => resetAll();
+    const go = () => {
+      resetAll();
+      onClose();
+    };
     if (Platform.OS === 'web') {
       if (window.confirm('Erase all training data? This cannot be undone.')) go();
     } else {
@@ -77,54 +73,15 @@ export function ProgramScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.h1}>Program</Text>
-
-      <View style={styles.card}>
-        <Text style={styles.cardKicker}>WHERE YOU ARE</Text>
-        <View style={styles.weekStrip}>
-          {[1, 2, 3, 4].map((w) => (
-            <View
-              key={w}
-              style={[styles.weekCell, s.week === w && styles.weekCellActive]}
-            >
-              <Text style={[styles.weekNum, mono, s.week === w && { color: theme.onAccent }]}>{w}</Text>
-              <Text style={[styles.weekLabel, s.week === w && { color: theme.onAccent }]}>
-                {WEEK_LABELS[w - 1]}
-              </Text>
-            </View>
-          ))}
-        </View>
-        <Text style={styles.cardBody}>
-          Cycle {s.cycle} · week {s.week} · next test:{' '}
-          {s.cycle % 2 === 1 ? 'bodyweight max reps' : 'weighted 5RM'} at the end of this cycle.
-          {s.pendingDeload ? ' Early deload is queued — the program noticed accumulated fatigue.' : ''}
-        </Text>
-        <Text style={styles.cardBody}>
-          {profile.equipment.mode === 'fixed' ? (
-            <>
-              Vest: <Text style={mono}>+{profile.equipment.fixedLoadKg} kg</Text> ·{' '}
-              <Text style={mono}>{s.weighted.setCount}</Text> working sets ·{' '}
-              <Text style={mono}>{Math.round(s.weighted.restSec / 60)} min</Text> rests
-            </>
-          ) : (
-            <>
-              Current training load: <Text style={mono}>+{s.weighted.loadKg} kg</Text>
-            </>
-          )}
-          {' '}· best max set: <Text style={mono}>{s.bwBestMaxSet}</Text> reps
-          {s.e1rmKg ? (
-            <>
-              {' '}· est. system 1RM: <Text style={mono}>{Math.round(s.e1rmKg)} kg</Text>
-            </>
-          ) : null}
-        </Text>
+    <Sheet visible={visible} onClose={onClose} title="Settings">
+      <View style={styles.row}>
+        <View style={[styles.dot, { backgroundColor: SYNC_DOT[syncState] }]} />
+        <Text style={styles.syncText}>{SYNC_LABEL[syncState]}</Text>
       </View>
 
-      <Text style={styles.h2}>Settings</Text>
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Bodyweight: {profile.bodyweightKg} kg</Text>
-        <View style={styles.rowGap}>
+        <Text style={styles.cardTitle}>Bodyweight — {profile.bodyweightKg} kg</Text>
+        <View style={styles.inlineRow}>
           <TextInput
             value={bwText}
             onChangeText={setBwText}
@@ -147,10 +104,11 @@ export function ProgramScreen() {
           </Pressable>
         </View>
       </View>
+
       {profile.equipment.mode === 'fixed' ? (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Vest weight: {profile.equipment.fixedLoadKg} kg</Text>
-          <View style={styles.rowGap}>
+          <Text style={styles.cardTitle}>Vest weight — {profile.equipment.fixedLoadKg} kg</Text>
+          <View style={styles.inlineRow}>
             <TextInput
               value={vestText}
               onChangeText={setVestText}
@@ -172,34 +130,19 @@ export function ProgramScreen() {
               <Text style={styles.smallBtnText}>Save</Text>
             </Pressable>
           </View>
-          <Text style={styles.cardBody}>
-            Measured your vest, or added weight to it? Update this — all targets re-derive
-            automatically.
-          </Text>
         </View>
       ) : null}
 
-      <Pressable onPress={() => void syncNow()} style={styles.card}>
-        <View style={styles.rowGap}>
-          <View
-            style={[
-              styles.syncDot,
-              syncState === 'synced' && { backgroundColor: theme.good },
-              syncState === 'error' && { backgroundColor: theme.danger },
-              syncState === 'syncing' && { backgroundColor: theme.warn },
-            ]}
-          />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>{SYNC_LABEL[syncState]}</Text>
-            <Text style={styles.cardBody}>
-              {lastSyncedAt
-                ? `Last synced ${lastSyncedAt.slice(11, 16)} · tap to sync now`
-                : 'Backs up automatically after every session · tap to sync now'}
-            </Text>
-          </View>
-        </View>
-      </Pressable>
-      <View style={styles.rowGap}>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Where you are</Text>
+        <Text style={styles.cardBody}>
+          Cycle {s.cycle} · week {s.week} · training load{' '}
+          <Text style={mono}>+{s.weighted.loadKg || profile.equipment.fixedLoadKg} kg</Text> · best
+          max set <Text style={mono}>{s.bwBestMaxSet}</Text> reps
+        </Text>
+      </View>
+
+      <View style={styles.inlineRow}>
         <Pressable onPress={doExport} style={[styles.smallBtn, { flex: 1 }]}>
           <Text style={styles.smallBtnText}>Export backup</Text>
         </Pressable>
@@ -225,43 +168,29 @@ export function ProgramScreen() {
       <Pressable onPress={doReset} style={styles.dangerBtn}>
         <Text style={styles.dangerText}>Reset all data</Text>
       </Pressable>
-    </ScrollView>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.bg },
-  content: { padding: theme.pad, gap: 12, paddingBottom: 40 },
-  h1: { color: theme.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  h2: { color: theme.text, fontSize: 17, fontWeight: '700', marginTop: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  syncText: { color: theme.textDim, fontSize: 12.5, flex: 1 },
   card: {
     backgroundColor: theme.card,
-    borderRadius: theme.radius,
+    borderRadius: theme.radiusLg,
     borderWidth: 1,
     borderColor: theme.border,
     padding: 14,
     gap: 8,
+    marginBottom: 12,
   },
-  cardKicker: { color: theme.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },
-  cardTitle: { color: theme.text, fontSize: 15, fontWeight: '700' },
-  cardBody: { color: theme.textDim, fontSize: 13, lineHeight: 20 },
-  weekStrip: { flexDirection: 'row', gap: 6 },
-  weekCell: {
-    flex: 1,
-    backgroundColor: theme.cardRaised,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: theme.border,
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  weekCellActive: { backgroundColor: theme.accent, borderColor: theme.accent },
-  weekNum: { color: theme.text, fontSize: 16, fontWeight: '800' },
-  weekLabel: { color: theme.textDim, fontSize: 9, marginTop: 2 },
-  rowGap: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  cardTitle: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  cardBody: { color: theme.textDim, fontSize: 13, lineHeight: 19 },
+  inlineRow: { flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 12 },
   input: {
     flex: 1,
-    backgroundColor: theme.cardRaised,
+    backgroundColor: theme.cardMuted,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: theme.border,
@@ -271,7 +200,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   smallBtn: {
-    backgroundColor: theme.cardRaised,
+    backgroundColor: theme.cardMuted,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: theme.border,
@@ -280,13 +209,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   smallBtnText: { color: theme.text, fontSize: 13, fontWeight: '600' },
-  dangerBtn: { alignItems: 'center', paddingVertical: 12 },
+  dangerBtn: { alignItems: 'center', paddingVertical: 10 },
   dangerText: { color: theme.danger, fontSize: 13 },
-  syncDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: theme.textFaint,
-    marginTop: 4,
-  },
 });

@@ -1,43 +1,21 @@
 import React, { useMemo, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
-import { LoggedSession } from '../engine/types';
-import { ManualLog } from '../components/ManualLog';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useStore } from '../hooks/useStore';
 import { computeGoals } from '../engine/goals';
 import { e1rmSystem } from '../engine/epley';
-import { theme, mono } from '../theme';
+import { theme, mono, type } from '../theme';
 import { TrendChart, Point } from '../components/TrendChart';
+import { SettingsSheet } from '../components/SettingsSheet';
 
 type Metric = 'e1rm' | 'bwMax';
 type Range = '1m' | '3m' | 'all';
 
-const DAY_LABEL: Record<string, string> = {
-  calibration: 'Calibration',
-  heavy: 'Vest day',
-  volume: 'Volume',
-  max: 'Max day',
-  ladder: 'Ladders',
-  deloadHeavy: 'Deload',
-  deloadVolume: 'Deload',
-  testBw: 'BW test',
-  testWeighted: 'Vest test',
-  custom: 'Own workout',
-};
-
 export function ProgressScreen() {
-  const { store, editSession, deleteSession, restoreSession, emptyTrash } = useStore();
+  const { store } = useStore();
   const { width } = useWindowDimensions();
   const [metric, setMetric] = useState<Metric>('e1rm');
   const [range, setRange] = useState<Range>('3m');
-  const [editing, setEditing] = useState<LoggedSession | null>(null);
-  const [trashOpen, setTrashOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const profile = store.profile!;
 
@@ -49,7 +27,6 @@ export function ProgressScreen() {
     const cut = cutoff.toISOString().slice(0, 10);
 
     if (metric === 'e1rm') {
-      // best e1RM implied by any weighted set, per session
       return store.sessions
         .filter((s) => s.date >= cut)
         .map((s) => {
@@ -63,7 +40,6 @@ export function ProgressScreen() {
         })
         .filter((p) => p.value > 0);
     }
-    // bwMax: best single BW set on max/test days
     return store.sessions
       .filter((s) => s.date >= cut && ['max', 'testBw'].includes(s.dayKind))
       .map((s) => ({
@@ -97,25 +73,16 @@ export function ProgressScreen() {
     return store.sessions.filter((s) => s.date >= cut).length;
   }, [store.sessions]);
 
-  const chartWidth = Math.min(width, 480) - theme.pad * 2 - 24;
-
-  if (editing) {
-    return (
-      <ManualLog
-        defaultLoadKg={profile.equipment.fixedLoadKg}
-        initial={editing}
-        onCancel={() => setEditing(null)}
-        onSave={(session) => {
-          editSession(session);
-          setEditing(null);
-        }}
-      />
-    );
-  }
+  const chartWidth = Math.min(width, 480) - theme.pad * 2 - 40;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.h1}>Progress</Text>
+      <View style={styles.headerRow}>
+        <Text style={type.hero}>Progress</Text>
+        <Pressable onPress={() => setSettingsOpen(true)} style={styles.gearBtn} hitSlop={10}>
+          <Text style={styles.gearIcon}>⚙</Text>
+        </Pressable>
+      </View>
 
       <View style={styles.statRow}>
         <View style={styles.stat}>
@@ -149,106 +116,63 @@ export function ProgressScreen() {
         </View>
       </View>
 
-      <Text style={styles.h2}>Goals</Text>
-      {goals.length === 0 ? (
-        <Text style={styles.dim}>Goals appear after calibration.</Text>
-      ) : (
-        goals.map((g) => (
-          <View key={g.quality} style={styles.card}>
-            <Text style={styles.goalLabel}>{g.label}</Text>
-            <View style={styles.goalRow}>
-              <Text style={[styles.goalNow, mono]}>
-                {g.quality === 'bwReps' ? `${g.currentValue} now` : `+${g.currentValue} kg ×5 now`}
-              </Text>
-              <Text style={styles.goalEta}>≈ {g.etaMonth}</Text>
-            </View>
-            <Text style={styles.goalRate}>
-              pace: {g.ratePerMonth} {g.quality === 'bwReps' ? 'reps' : 'kg'}/month
-            </Text>
-          </View>
-        ))
-      )}
-
-      <Text style={styles.h2}>History</Text>
-      {store.sessions.length === 0 ? (
-        <Text style={styles.dim}>Your logged sessions appear here.</Text>
-      ) : (
-        [...store.sessions]
-          .reverse()
-          .slice(0, 15)
-          .map((s) => {
-            const reps = s.sets.reduce((sum, x) => sum + x.actualReps, 0);
-            const topLoad = Math.max(0, ...s.sets.map((x) => x.loadKg));
+      <View style={styles.card}>
+        <Text style={type.kickerDim}>GOALS</Text>
+        {goals.length === 0 ? (
+          <Text style={styles.dim}>Goals appear after calibration.</Text>
+        ) : (
+          goals.map((g, i) => {
+            const pct = Math.min(
+              100,
+              Math.max(
+                4,
+                Math.round(
+                  ((g.targetValue - g.currentValue === 0 ? 1 : g.currentValue) / g.targetValue) * 100
+                )
+              )
+            );
             return (
-              <View key={s.id} style={styles.histRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.histTitle}>{DAY_LABEL[s.dayKind] ?? s.dayKind}</Text>
-                  <Text style={styles.histMeta}>
-                    {s.date} · <Text style={mono}>{reps}</Text> reps
-                    {topLoad > 0 ? (
-                      <>
-                        {' '}· <Text style={mono}>+{topLoad} kg</Text>
-                      </>
-                    ) : null}
-                  </Text>
+              <View key={g.quality} style={i > 0 ? { marginTop: 16 } : { marginTop: 12 }}>
+                <View style={styles.goalRow}>
+                  <Text style={styles.goalLabel}>{g.label}</Text>
+                  <Text style={styles.goalEta}>ETA {g.etaMonth}</Text>
                 </View>
-                <Pressable onPress={() => setEditing(s)} hitSlop={8} style={styles.histBtn}>
-                  <Text style={styles.histBtnText}>Edit</Text>
-                </Pressable>
-                <Pressable onPress={() => deleteSession(s.id)} hitSlop={8} style={styles.histBtn}>
-                  <Text style={styles.histTrash}>🗑</Text>
-                </Pressable>
+                <View style={styles.barTrack}>
+                  <View style={[styles.barFill, { width: `${pct}%` }]} />
+                </View>
               </View>
             );
           })
-      )}
-      {store.trash.length > 0 ? (
-        <View style={styles.card}>
-          <Pressable onPress={() => setTrashOpen(!trashOpen)}>
-            <Text style={styles.trashHeader}>
-              🗑 Recently deleted ({store.trash.length}) — tap to {trashOpen ? 'hide' : 'show'}
-            </Text>
-          </Pressable>
-          {trashOpen
-            ? store.trash.map((s) => (
-                <View key={s.id} style={styles.histRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.histTitle}>{DAY_LABEL[s.dayKind] ?? s.dayKind}</Text>
-                    <Text style={styles.histMeta}>
-                      {s.date} · {s.sets.reduce((sum, x) => sum + x.actualReps, 0)} reps
-                    </Text>
-                  </View>
-                  <Pressable onPress={() => restoreSession(s.id)} style={styles.histBtn}>
-                    <Text style={[styles.histBtnText, { color: theme.good }]}>Restore</Text>
-                  </Pressable>
-                </View>
-              ))
-            : null}
-          {trashOpen ? (
-            <Pressable onPress={emptyTrash} style={{ paddingVertical: 6 }}>
-              <Text style={styles.emptyTrash}>Empty trash</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
+        )}
+        {goals.length > 0 ? (
+          <Text style={styles.goalFootnote}>
+            ETAs assume your current pace holds, with a deload every 4th week.
+          </Text>
+        ) : null}
+      </View>
 
-      <Text style={styles.h2}>Personal records</Text>
-      {store.prs.length === 0 ? (
-        <Text style={styles.dim}>PRs land here — first ones usually within 2 weeks.</Text>
-      ) : (
-        [...store.prs]
-          .reverse()
-          .slice(0, 8)
-          .map((pr, i) => (
-            <View key={i} style={styles.prRow}>
-              <Text style={styles.prBadge}>PR</Text>
-              <Text style={styles.prText}>
-                {pr.kind === 'bwReps' ? `${pr.value} strict pull-ups` : `${pr.value} kg est. 1RM (system)`}
-              </Text>
-              <Text style={styles.prDate}>{pr.date}</Text>
-            </View>
-          ))
-      )}
+      <View style={styles.card}>
+        <Text style={type.kickerDim}>PERSONAL RECORDS</Text>
+        {store.prs.length === 0 ? (
+          <Text style={styles.dim}>PRs land here — first ones usually within 2 weeks.</Text>
+        ) : (
+          [...store.prs]
+            .reverse()
+            .slice(0, 8)
+            .map((pr, i) => (
+              <View key={i} style={styles.prRow}>
+                <Text style={styles.prText}>
+                  {pr.kind === 'bwReps' ? 'Bodyweight max' : 'Estimated 1RM'}
+                </Text>
+                <Text style={[styles.prValue, mono]}>
+                  {pr.kind === 'bwReps' ? `${pr.value} reps` : `${pr.value} kg`} · {pr.date.slice(5)}
+                </Text>
+              </View>
+            ))
+        )}
+      </View>
+
+      <SettingsSheet visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </ScrollView>
   );
 }
@@ -276,92 +200,65 @@ function Seg({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.bg },
-  content: { padding: theme.pad, gap: 12, paddingBottom: 40 },
-  h1: { color: theme.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  h2: { color: theme.text, fontSize: 17, fontWeight: '700', marginTop: 10 },
-  dim: { color: theme.textFaint, fontSize: 13 },
+  content: { padding: theme.pad, gap: 12, paddingBottom: 120 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  gearBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gearIcon: { fontSize: 16, color: theme.textDim },
+  dim: { color: theme.textFaint, fontSize: 13, marginTop: 8 },
   statRow: { flexDirection: 'row', gap: 10 },
   stat: {
     flex: 1,
     backgroundColor: theme.card,
-    borderRadius: theme.radius,
+    borderRadius: theme.radiusLg,
     borderWidth: 1,
     borderColor: theme.border,
     padding: 12,
     alignItems: 'center',
   },
-  statValue: { color: theme.text, fontSize: 22, fontWeight: '700' },
+  statValue: { color: theme.text, fontSize: 21, fontWeight: '700' },
   statLabel: { color: theme.textFaint, fontSize: 11, marginTop: 2 },
   card: {
     backgroundColor: theme.card,
-    borderRadius: theme.radius,
+    borderRadius: theme.radiusLg,
     borderWidth: 1,
     borderColor: theme.border,
-    padding: 12,
-    gap: 10,
+    padding: 18,
+    gap: 6,
   },
   segRow: { flexDirection: 'row', gap: 8 },
   seg: {
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 9,
-    backgroundColor: theme.cardRaised,
+    backgroundColor: theme.cardMuted,
     borderWidth: 1,
     borderColor: theme.border,
   },
   segSmall: { paddingHorizontal: 14 },
-  segActive: { borderColor: theme.accent },
+  segActive: { borderColor: theme.accent, backgroundColor: theme.cardTint },
   segText: { color: theme.textDim, fontSize: 12, fontWeight: '600' },
-  segTextActive: { color: theme.accent },
-  goalLabel: { color: theme.text, fontSize: 16, fontWeight: '700' },
+  segTextActive: { color: theme.accentDark },
   goalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  goalNow: { color: theme.textDim, fontSize: 14 },
-  goalEta: { color: theme.accent, fontSize: 15, fontWeight: '700' },
-  goalRate: { color: theme.textFaint, fontSize: 12 },
+  goalLabel: { color: theme.text, fontSize: 13.5, fontWeight: '600' },
+  goalEta: { color: theme.textFaint, fontSize: 12.5 },
+  barTrack: { marginTop: 7, height: 6, borderRadius: 3, backgroundColor: theme.cardMuted },
+  barFill: { height: 6, borderRadius: 3, backgroundColor: theme.accent },
+  goalFootnote: { color: theme.textFaint, fontSize: 11.5, marginTop: 14, lineHeight: 17 },
   prRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: theme.card,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: theme.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    marginTop: 4,
   },
-  prBadge: {
-    color: theme.onAccent,
-    backgroundColor: theme.accent,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  prText: { color: theme.text, fontSize: 14, flex: 1 },
-  prDate: { color: theme.textFaint, fontSize: 12 },
-  histRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: theme.card,
-    borderRadius: theme.radius,
-    borderWidth: 1,
-    borderColor: theme.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  histTitle: { color: theme.text, fontSize: 14, fontWeight: '600' },
-  histMeta: { color: theme.textFaint, fontSize: 12, marginTop: 1 },
-  histBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 9,
-    backgroundColor: theme.cardRaised,
-  },
-  histBtnText: { color: theme.textDim, fontSize: 12, fontWeight: '600' },
-  histTrash: { fontSize: 13 },
-  trashHeader: { color: theme.textDim, fontSize: 13, fontWeight: '600' },
-  emptyTrash: { color: theme.danger, fontSize: 12 },
+  prText: { color: theme.text, fontSize: 13.5 },
+  prValue: { color: theme.textDim, fontSize: 13 },
 });

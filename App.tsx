@@ -1,57 +1,68 @@
-import React from 'react';
-import { Text, View, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer, DarkTheme } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { BlurView } from 'expo-blur';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoreProvider, useStore } from './src/hooks/useStore';
+import { WorkoutProvider, useWorkout } from './src/hooks/useWorkout';
 import { TodayScreen } from './src/screens/TodayScreen';
+import { HistoryScreen } from './src/screens/HistoryScreen';
 import { ProgressScreen } from './src/screens/ProgressScreen';
-import { ProgramScreen } from './src/screens/ProgramScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { WorkoutOverlay } from './src/components/WorkoutOverlay';
 import { theme } from './src/theme';
 
-const Tab = createBottomTabNavigator();
-
-const navTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: theme.bg,
-    card: theme.card,
-    border: theme.border,
-    primary: theme.accent,
-    text: theme.text,
-  },
+type TabName = 'Today' | 'History' | 'Progress';
+const TABS: TabName[] = ['Today', 'History', 'Progress'];
+const SCREENS: Record<TabName, React.ComponentType> = {
+  Today: TodayScreen,
+  History: HistoryScreen,
+  Progress: ProgressScreen,
 };
 
-const ICONS: Record<string, string> = { Today: '●', Progress: '▲', Program: '≡' };
-
-function Tabs() {
+function TabBar({ active, onChange }: { active: TabName; onChange: (t: TabName) => void }) {
   const insets = useSafeAreaInsets();
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: theme.accent,
-        tabBarInactiveTintColor: theme.textFaint,
-        tabBarStyle: {
-          backgroundColor: theme.card,
-          borderTopColor: theme.border,
-          height: 66 + insets.bottom,
-          paddingTop: 8,
-          paddingBottom: Math.max(insets.bottom, 8),
-        },
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
-        tabBarIcon: ({ color }) => (
-          <Text style={{ color, fontSize: 24, lineHeight: 28 }}>{ICONS[route.name]}</Text>
-        ),
-      })}
+    <BlurView
+      intensity={40}
+      tint="light"
+      style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 14) }]}
     >
-      <Tab.Screen name="Today" component={TodayScreen} />
-      <Tab.Screen name="Progress" component={ProgressScreen} />
-      <Tab.Screen name="Program" component={ProgramScreen} />
-    </Tab.Navigator>
+      {TABS.map((t) => (
+        <Pressable key={t} onPress={() => onChange(t)} style={styles.tabItem}>
+          <View style={[styles.tabDot, { backgroundColor: active === t ? theme.accent : 'transparent' }]} />
+          <Text style={[styles.tabLabel, { color: active === t ? theme.accent : theme.textFaint }]}>
+            {t}
+          </Text>
+        </Pressable>
+      ))}
+    </BlurView>
+  );
+}
+
+function Tabs() {
+  const [active, setActive] = useState<TabName>('Today');
+  const Screen = SCREENS[active];
+  return (
+    <View style={{ flex: 1 }}>
+      <Screen />
+      <TabBar active={active} onChange={setActive} />
+    </View>
+  );
+}
+
+function WorkoutHost() {
+  const workout = useWorkout();
+  const { store, completeSession } = useStore();
+  if (!workout.activePlan || !store.profile) return <Tabs />;
+  return (
+    <WorkoutOverlay
+      plan={workout.activePlan}
+      profile={store.profile}
+      readiness={workout.activeReadiness}
+      onCancel={workout.end}
+      onSave={completeSession}
+    />
   );
 }
 
@@ -60,20 +71,19 @@ function Root() {
   const insets = useSafeAreaInsets();
   if (!ready) {
     return (
-      <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={styles.loading}>
         <ActivityIndicator color={theme.accent} />
       </View>
     );
   }
-  // one place handles the notch for every screen; the tab bar handles the bottom
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: theme.outerBg, paddingTop: insets.top }}>
       {!store.profile ? (
         <OnboardingScreen />
       ) : (
-        <NavigationContainer theme={navTheme}>
-          <Tabs />
-        </NavigationContainer>
+        <WorkoutProvider>
+          <WorkoutHost />
+        </WorkoutProvider>
       )}
     </View>
   );
@@ -83,9 +93,28 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StoreProvider>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
         <Root />
       </StoreProvider>
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  loading: { flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center' },
+  tabBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+    overflow: 'hidden',
+  },
+  tabItem: { alignItems: 'center', width: 80, gap: 5 },
+  tabDot: { width: 5, height: 5, borderRadius: 2.5 },
+  tabLabel: { fontSize: 12, fontWeight: '600' },
+});
