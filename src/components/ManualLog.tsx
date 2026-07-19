@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LoggedSession } from '../engine/types';
 import { theme, mono } from '../theme';
@@ -25,14 +25,22 @@ export function ManualLog({
   onClose: () => void;
   onSave: (session: LoggedSession) => void;
 }) {
-  const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
-  const [rows, setRows] = useState<Row[]>(
-    initial
-      ? initial.sets
-          .filter((s) => !s.isWarmup)
-          .map((s) => ({ reps: String(s.actualReps), loadKg: String(s.loadKg) }))
-      : [{ reps: '', loadKg: '0' }]
-  );
+  const [date, setDate] = useState('');
+  const [rows, setRows] = useState<Row[]>([]);
+
+  // The sheet stays mounted while hidden, so the form must re-seed itself
+  // from `initial` every time it opens — not just on first mount.
+  useEffect(() => {
+    if (!visible) return;
+    setDate(initial?.date ?? new Date().toISOString().slice(0, 10));
+    setRows(
+      initial
+        ? initial.sets
+            .filter((s) => !s.isWarmup)
+            .map((s) => ({ reps: String(s.actualReps), loadKg: String(s.loadKg) }))
+        : [{ reps: '', loadKg: '0' }]
+    );
+  }, [visible, initial]);
 
   const setRow = (i: number, patch: Partial<Row>) =>
     setRows((r) => r.map((row, j) => (j === i ? { ...row, ...patch } : row)));
@@ -44,18 +52,21 @@ export function ManualLog({
 
   const save = () => {
     if (!valid) return;
+    // Editing keeps the session's identity (dayKind, cycle position, effort,
+    // warm-up sets) — otherwise replaying history would rewind the schedule.
+    const warmups = initial?.sets.filter((s) => s.isWarmup) ?? [];
     onSave({
+      ...(initial ?? {}),
       id: initial?.id ?? `manual-${date}-${Math.random().toString(36).slice(2, 8)}`,
       date,
-      dayKind: 'custom',
-      cycle: 0,
-      week: 0,
-      sets: parsed.map((r) => ({ targetReps: r.reps, actualReps: r.reps, loadKg: r.loadKg })),
+      dayKind: initial?.dayKind ?? 'custom',
+      cycle: initial?.cycle ?? 0,
+      week: initial?.week ?? 0,
+      sets: [
+        ...warmups,
+        ...parsed.map((r) => ({ targetReps: r.reps, actualReps: r.reps, loadKg: r.loadKg })),
+      ],
     });
-    if (!initial) {
-      setDate(new Date().toISOString().slice(0, 10));
-      setRows([{ reps: '', loadKg: '0' }]);
-    }
   };
 
   return (

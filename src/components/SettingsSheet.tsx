@@ -137,8 +137,14 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
         <Text style={styles.cardTitle}>Where you are</Text>
         <Text style={styles.cardBody}>
           Cycle {s.cycle} · week {s.week} · training load{' '}
-          <Text style={mono}>+{s.weighted.loadKg || profile.equipment.fixedLoadKg} kg</Text> · best
-          max set <Text style={mono}>{s.bwBestMaxSet}</Text> reps
+          <Text style={mono}>
+            +
+            {profile.equipment.mode === 'fixed'
+              ? profile.equipment.fixedLoadKg
+              : s.weighted.loadKg}{' '}
+            kg
+          </Text>{' '}
+          · best max set <Text style={mono}>{s.bwBestMaxSet}</Text> reps
         </Text>
       </View>
 

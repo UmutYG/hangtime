@@ -129,15 +129,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return { ...s, sessions, trash, ...r };
   };
 
+  // Upsert: replaces an existing session by id, or appends a new one (manual
+  // logs from History arrive with fresh ids). Sessions stay date-sorted so a
+  // backdated log replays in the right order.
   const editSession = useCallback(
     (session: LoggedSession) => {
-      update((s) =>
-        rebuilt(
-          s,
-          s.sessions.map((x) => (x.id === session.id ? session : x)),
-          s.trash
-        )
-      );
+      update((s) => {
+        const exists = s.sessions.some((x) => x.id === session.id);
+        const sessions = exists
+          ? s.sessions.map((x) => (x.id === session.id ? session : x))
+          : [...s.sessions, session];
+        sessions.sort((a, b) => a.date.localeCompare(b.date));
+        return rebuilt(s, sessions, s.trash);
+      });
     },
     [update]
   );

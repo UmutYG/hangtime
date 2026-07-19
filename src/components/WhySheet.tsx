@@ -82,9 +82,10 @@ export function WhySheet({
   const steps = useLadderSteps(plan, state, profile);
 
   return (
-    <Sheet visible={visible} onClose={onClose} title={plan.why || 'Why this workout'}>
+    <Sheet visible={visible} onClose={onClose} title="Why this workout">
       {steps ? (
         <>
+          <Text style={styles.lead}>{plan.why}</Text>
           <Text style={styles.intro}>
             With a fixed {profile.equipment.fixedLoadKg} kg vest you can't add plates, so the
             engine progresses in a strict order — the way fixed-load athletes actually do it:
@@ -132,13 +133,17 @@ export function WhySheet({
           </Text>
         </>
       ) : (
-        <Text style={styles.intro}>{plan.whyDetail || plan.why}</Text>
+        <>
+          <Text style={styles.lead}>{plan.why}</Text>
+          {plan.whyDetail ? <Text style={styles.intro}>{plan.whyDetail}</Text> : null}
+        </>
       )}
     </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
+  lead: { fontSize: 14.5, lineHeight: 21.5, color: theme.text, fontWeight: '600', marginBottom: 8 },
   intro: { fontSize: 13.5, lineHeight: 20.5, color: theme.textDim },
   stepRow: {
     flexDirection: 'row',

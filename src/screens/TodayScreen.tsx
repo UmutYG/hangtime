@@ -29,7 +29,7 @@ export function TodayScreen() {
   const [readiness, setReadiness] = useState<Readiness | undefined>();
   const [whyOpen, setWhyOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
-  const { completeSession } = useStore();
+  const { editSession } = useStore();
 
   const profile = store.profile!;
   const plan = useMemo(
@@ -187,7 +187,7 @@ export function TodayScreen() {
         defaultLoadKg={profile.equipment.fixedLoadKg}
         onClose={() => setLogOpen(false)}
         onSave={(session) => {
-          completeSession(session);
+          editSession(session);
           setLogOpen(false);
         }}
       />
