@@ -21,6 +21,7 @@ export const theme = {
   good: '#3C7A57',
   warn: '#B08A2E',
   danger: '#B0413E',
+  run: '#3E7CB8',
   radius: 16,
   radiusLg: 20,
   radiusSheet: 24,

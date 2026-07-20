@@ -5,6 +5,7 @@ import { computeGoals } from '../engine/goals';
 import { e1rmSystem } from '../engine/epley';
 import { theme, mono, type } from '../theme';
 import { TrendChart, Point } from '../components/TrendChart';
+import { RunningCard } from '../components/RunningCard';
 import { SettingsSheet } from '../components/SettingsSheet';
 
 type Metric = 'e1rm' | 'bwMax';
@@ -115,6 +116,8 @@ export function ProgressScreen() {
           ))}
         </View>
       </View>
+
+      <RunningCard width={chartWidth} />
 
       <View style={styles.card}>
         <Text style={type.kickerDim}>GOALS</Text>

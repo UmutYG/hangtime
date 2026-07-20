@@ -165,6 +165,12 @@ export interface Store {
   lifetimeReps: number;
   /** soft-deleted sessions — restorable until emptied */
   trash: LoggedSession[];
+  /** running module: imported from Apple Health or logged manually */
+  runs: import('./runs').Run[];
+  /** ids of Health-imported runs the user removed — blocks re-import */
+  deletedRunIds: string[];
+  /** user has connected Apple Health — auto-sync runs on launch */
+  healthEnabled: boolean;
   /** last local mutation, ISO datetime — drives cloud-sync conflict resolution */
   updatedAt?: string;
 }

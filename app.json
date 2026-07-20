@@ -30,6 +30,12 @@
         {
           "iCloudContainerEnvironment": "Production"
         }
+      ],
+      [
+        "react-native-health",
+        {
+          "healthSharePermission": "Hangtime reads your running workouts from Apple Health to show them alongside your pull-up training."
+        }
       ]
     ]
   }

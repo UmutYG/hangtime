@@ -8,9 +8,11 @@ import React, {
 } from 'react';
 import { applyResult, replayAll } from '../engine/stateMachine';
 import { LoggedSession, Profile, Store } from '../engine/types';
+import { mergeRuns, Run } from '../engine/runs';
 import { initialState } from '../engine/generator';
 import { emptyStore, importJson, loadStore, saveStore, stamp } from '../lib/storage';
 import { isCloudAvailable, pickNewer, pullFromCloud, pushToCloud, SyncState } from '../lib/cloudSync';
+import { fetchRunsFromHealth, isHealthModuleAvailable, requestHealthAuth } from '../lib/health';
 
 interface StoreApi {
   store: Store;
@@ -24,6 +26,11 @@ interface StoreApi {
   deleteSession: (id: string) => void;
   restoreSession: (id: string) => void;
   emptyTrash: () => void;
+  addRun: (run: Run) => void;
+  editRun: (run: Run) => void;
+  deleteRun: (id: string) => void;
+  /** connect + pull runs from Apple Health; 'unavailable' in Expo Go / web */
+  syncHealth: () => Promise<{ added: number } | 'unavailable' | 'denied'>;
   importStore: (json: string) => boolean;
   resetAll: () => void;
   syncNow: () => Promise<void>;
@@ -177,6 +184,64 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     update((s) => ({ ...s, trash: [] }));
   }, [update]);
 
+  const addRun = useCallback(
+    (run: Run) => {
+      update((s) => ({ ...s, runs: mergeRuns(s.runs, [run], s.deletedRunIds) }));
+    },
+    [update]
+  );
+
+  const editRun = useCallback(
+    (run: Run) => {
+      update((s) => ({
+        ...s,
+        runs: s.runs
+          .map((r) => (r.id === run.id ? run : r))
+          .sort((a, b) => a.date.localeCompare(b.date)),
+      }));
+    },
+    [update]
+  );
+
+  const deleteRun = useCallback(
+    (id: string) => {
+      update((s) => {
+        const target = s.runs.find((r) => r.id === id);
+        return {
+          ...s,
+          runs: s.runs.filter((r) => r.id !== id),
+          // remember Health-imported ids so the next sync doesn't resurrect them
+          deletedRunIds:
+            target?.source === 'health' ? [...s.deletedRunIds, id] : s.deletedRunIds,
+        };
+      });
+    },
+    [update]
+  );
+
+  const syncHealth = useCallback(async (): Promise<
+    { added: number } | 'unavailable' | 'denied'
+  > => {
+    if (!isHealthModuleAvailable()) return 'unavailable';
+    const authorized = await requestHealthAuth();
+    if (!authorized) return 'denied';
+    const imported = await fetchRunsFromHealth();
+    let added = 0;
+    update((s) => {
+      const merged = mergeRuns(s.runs, imported, s.deletedRunIds);
+      added = merged.length - s.runs.length;
+      return { ...s, runs: merged, healthEnabled: true };
+    });
+    return { added };
+  }, [update]);
+
+  // silent refresh on launch once the user has connected Health
+  useEffect(() => {
+    if (!ready || !store.healthEnabled) return;
+    void syncHealth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, store.healthEnabled]);
+
   const importStore = useCallback(
     (json: string): boolean => {
       try {
@@ -224,6 +289,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         deleteSession,
         restoreSession,
         emptyTrash,
+        addRun,
+        editRun,
+        deleteRun,
+        syncHealth,
         importStore,
         resetAll,
         syncNow,
