@@ -16,6 +16,12 @@ export function ModeSwitch() {
         <Text style={[styles.text, mode === 'pullups' && styles.textActive]}>Pull-ups</Text>
       </Pressable>
       <Pressable
+        onPress={() => setAppMode('pushups')}
+        style={[styles.seg, mode === 'pushups' && { backgroundColor: theme.push }]}
+      >
+        <Text style={[styles.text, mode === 'pushups' && styles.textActive]}>Push-ups</Text>
+      </Pressable>
+      <Pressable
         onPress={() => setAppMode('running')}
         style={[styles.seg, mode === 'running' && { backgroundColor: theme.run }]}
       >
@@ -35,7 +41,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     padding: 3,
   },
-  seg: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999 },
-  text: { fontSize: 12.5, fontWeight: '600', color: theme.textDim },
+  seg: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
+  text: { fontSize: 12, fontWeight: '600', color: theme.textDim },
   textActive: { color: '#FFFFFF' },
 });

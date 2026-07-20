@@ -34,12 +34,14 @@ export function WorkoutOverlay({
   plan,
   profile,
   readiness,
+  accent = theme.accent,
   onCancel,
   onSave,
 }: {
   plan: SessionPlan;
   profile: Profile;
   readiness?: string;
+  accent?: string;
   onCancel: () => void;
   onSave: (session: LoggedSession) => { prCount: number };
 }) {
@@ -160,7 +162,7 @@ export function WorkoutOverlay({
               style={[
                 styles.dot,
                 actuals[workingIdx[i]] !== undefined && styles.dotDone,
-                i === cursor && !resting && styles.dotCurrent,
+                i === cursor && !resting && { backgroundColor: accent },
               ]}
             />
           ))}
@@ -169,7 +171,7 @@ export function WorkoutOverlay({
 
       {!warmupDone ? (
         <View style={styles.centerFlex}>
-          <Text style={type.kicker}>Warm-up</Text>
+          <Text style={[type.kicker, { color: accent }]}>Warm-up</Text>
           <View style={styles.warmupCard}>
             {plan.sets
               .filter((s) => s.isWarmup)
@@ -189,7 +191,7 @@ export function WorkoutOverlay({
         <View style={styles.centerFlex}>
           <Text style={type.kickerDim}>Rest</Text>
           <View style={styles.ringWrap}>
-            <ProgressRing size={180} stroke={7} fraction={1 - restRemaining / Math.max(1, plan.sets[workingIdx[cursor - 1]]?.restSecAfter ?? 1)} />
+            <ProgressRing size={180} stroke={7} color={accent} fraction={1 - restRemaining / Math.max(1, plan.sets[workingIdx[cursor - 1]]?.restSecAfter ?? 1)} />
             <View style={styles.ringCenter}>
               <Text style={[styles.ringTime, mono]}>{fmtTime(restRemaining)}</Text>
             </View>
@@ -210,7 +212,7 @@ export function WorkoutOverlay({
         </View>
       ) : !finished && currentSet ? (
         <View style={styles.centerFlex}>
-          <Text style={type.kicker}>{setLabel(currentSet, cursor + 1, workingIdx.length).toUpperCase()}</Text>
+          <Text style={[type.kicker, { color: accent }]}>{setLabel(currentSet, cursor + 1, workingIdx.length).toUpperCase()}</Text>
           {currentSet.amrap ? (
             <Text style={styles.hint}>All-out set — this recalibrates your estimate</Text>
           ) : null}
@@ -230,7 +232,7 @@ export function WorkoutOverlay({
             target {currentSet.amrap ? `${currentSet.targetReps}+` : currentSet.targetReps}
             {currentSet.loadKg > 0 ? ` · +${currentSet.loadKg} kg` : ''}
           </Text>
-          <Pressable onPress={logSet} style={styles.accentBtn}>
+          <Pressable onPress={logSet} style={[styles.accentBtn, { backgroundColor: accent }]}>
             <Text style={styles.accentBtnText}>Log set</Text>
           </Pressable>
         </View>
@@ -269,7 +271,7 @@ export function WorkoutOverlay({
                   <Pressable
                     key={e.key}
                     onPress={() => setEffort(e.key)}
-                    style={[styles.effortChip, effort === e.key && styles.effortChipActive]}
+                    style={[styles.effortChip, effort === e.key && { backgroundColor: accent, borderColor: accent }]}
                   >
                     <Text style={[styles.effortChipText, effort === e.key && { color: theme.onAccent }]}>
                       {e.label}
@@ -283,7 +285,7 @@ export function WorkoutOverlay({
       )}
 
       {finished && !saved ? (
-        <Pressable onPress={save} style={styles.accentBtn}>
+        <Pressable onPress={save} style={[styles.accentBtn, { backgroundColor: accent }]}>
           <Text style={styles.accentBtnText}>Save session</Text>
         </Pressable>
       ) : finished && saved ? (

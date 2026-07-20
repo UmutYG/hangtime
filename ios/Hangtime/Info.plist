@@ -45,9 +45,15 @@
 		<true/>
 	</dict>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Hangtime reads your running workouts from Apple Health to show them alongside your pull-up training.</string>
+	<string>Hangtime reads your running workouts from Apple Health to show them alongside your training.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to update health info</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Allow $(PRODUCT_NAME) to access your location</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Allow $(PRODUCT_NAME) to access your location</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Hangtime uses your location to track distance and pace while you run — only during a run you start.</string>
 	<key>NSUbiquitousContainers</key>
 	<dict>
 		<key>iCloud.com.umutyg.hangtime</key>

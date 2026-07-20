@@ -13,11 +13,13 @@ export function TrendChart({
   height = 160,
   width = 340,
   unit,
+  accent = theme.accent,
 }: {
   points: Point[];
   height?: number;
   width?: number;
   unit: string;
+  accent?: string;
 }) {
   if (points.length === 0) {
     return (
@@ -68,15 +70,15 @@ export function TrendChart({
       <SvgText x={2} y={y(min) + 4} fill={theme.textDim} fontSize={10}>
         {Math.round(min)}
       </SvgText>
-      <Path d={d} stroke={theme.accent} strokeWidth={2.5} fill="none" />
+      <Path d={d} stroke={accent} strokeWidth={2.5} fill="none" />
       {points.map((p, i) => (
         <Circle
           key={i}
           cx={x(new Date(p.date).getTime())}
           cy={y(p.value)}
           r={3.5}
-          fill={i === points.length - 1 ? theme.accent : theme.card}
-          stroke={theme.accent}
+          fill={i === points.length - 1 ? accent : theme.card}
+          stroke={accent}
           strokeWidth={2}
         />
       ))}

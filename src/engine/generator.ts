@@ -66,7 +66,7 @@ export function resolveDayKind(state: ProgramState): DayKind {
   return state.week === 2 ? 'ladder' : 'max';
 }
 
-const TITLES: Record<DayKind, string> = {
+const TITLES: Partial<Record<DayKind, string>> = {
   calibration: 'Calibration — find your load',
   heavy: 'Vest Day — weighted pull-ups',
   volume: 'Volume Day — sub-max sets',
@@ -359,7 +359,7 @@ export function generateSession(
   if (rough) decisions.push({ code: 'READINESS_TRIM', params: {} });
 
   const { why, whyDetail } = buildWhy(decisions);
-  let title = TITLES[dayKind];
+  let title = TITLES[dayKind] ?? '';
   if (profile.equipment.mode === 'adjustable') {
     if (dayKind === 'heavy') title = 'Heavy Day — weighted pull-ups';
     if (dayKind === 'testWeighted') title = 'TEST — weighted 5RM';

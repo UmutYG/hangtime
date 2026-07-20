@@ -22,6 +22,7 @@ export const theme = {
   warn: '#B08A2E',
   danger: '#B0413E',
   run: '#3E7CB8',
+  push: '#7C58A8',
   radius: 16,
   radiusLg: 20,
   radiusSheet: 24,
@@ -32,6 +33,13 @@ export const mono: TextStyle = {
   fontFamily: 'Menlo',
   fontVariant: ['tabular-nums'],
 };
+
+/** each training space carries its own accent through every screen */
+export function modeAccent(mode: 'pullups' | 'running' | 'pushups'): string {
+  if (mode === 'running') return theme.run;
+  if (mode === 'pushups') return theme.push;
+  return theme.accent;
+}
 
 export const type = {
   hero: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5, color: theme.text } as TextStyle,

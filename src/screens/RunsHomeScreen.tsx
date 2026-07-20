@@ -6,6 +6,7 @@ import { theme, mono, type } from '../theme';
 import { ModeSwitch } from '../components/ModeSwitch';
 import { WeeklyBars } from '../components/WeeklyBars';
 import { RunLog } from '../components/RunLog';
+import { RunTracker } from '../components/RunTracker';
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -22,6 +23,7 @@ export function RunsHomeScreen() {
   const { store, syncHealth, addRun, editRun } = useStore();
   const { width } = useWindowDimensions();
   const [logOpen, setLogOpen] = useState(false);
+  const [trackerOpen, setTrackerOpen] = useState(false);
   const [editing, setEditing] = useState<Run | null>(null);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -88,8 +90,11 @@ export function RunsHomeScreen() {
         </View>
       )}
 
+      <Pressable onPress={() => setTrackerOpen(true)} style={styles.startRunBtn}>
+        <Text style={styles.startRunText}>Start run</Text>
+      </Pressable>
       <Pressable onPress={() => setLogOpen(true)} style={styles.logBtn}>
-        <Text style={styles.logBtnText}>Log a run</Text>
+        <Text style={styles.logBtnText}>Log a run manually</Text>
       </Pressable>
 
       {recent.length > 0 ? (
@@ -118,6 +123,11 @@ export function RunsHomeScreen() {
         </>
       ) : null}
 
+      <RunTracker
+        visible={trackerOpen}
+        onClose={() => setTrackerOpen(false)}
+        onSave={(run) => addRun(run)}
+      />
       <RunLog
         visible={logOpen}
         onClose={() => setLogOpen(false)}
@@ -168,15 +178,15 @@ const styles = StyleSheet.create({
   },
   connectText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   syncMsg: { fontSize: 12, color: theme.textFaint },
-  logBtn: {
-    backgroundColor: theme.card,
-    borderWidth: 1,
-    borderColor: theme.border,
+  startRunBtn: {
+    backgroundColor: theme.run,
     borderRadius: 999,
-    paddingVertical: 13,
+    paddingVertical: 17,
     alignItems: 'center',
   },
-  logBtnText: { color: theme.run, fontSize: 14.5, fontWeight: '700' },
+  startRunText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  logBtn: { alignItems: 'center', paddingVertical: 4 },
+  logBtnText: { color: theme.textFaint, fontSize: 13 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: theme.text, marginTop: 4 },
   row: {
     flexDirection: 'row',

@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react';
 import { applyResult, replayAll } from '../engine/stateMachine';
+import { applyPushResult, initialPushState, replayPushAll } from '../engine/pushups';
 import { LoggedSession, Profile, Store } from '../engine/types';
 import { mergeRuns, Run } from '../engine/runs';
 import { initialState } from '../engine/generator';
@@ -32,6 +33,13 @@ interface StoreApi {
   /** connect + pull runs from Apple Health; 'unavailable' in Expo Go / web */
   syncHealth: () => Promise<{ added: number } | 'unavailable' | 'denied'>;
   setAppMode: (mode: Store['appMode']) => void;
+  /** first entry into push-ups mode: seed the engine with the user's max */
+  setPushMax: (max: number) => void;
+  completePushSession: (session: LoggedSession) => { prCount: number };
+  editPushSession: (session: LoggedSession) => void;
+  deletePushSession: (id: string) => void;
+  restorePushSession: (id: string) => void;
+  emptyPushTrash: () => void;
   importStore: (json: string) => boolean;
   resetAll: () => void;
   syncNow: () => Promise<void>;
@@ -192,6 +200,92 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [update]
   );
 
+  const setPushMax = useCallback(
+    (max: number) => {
+      update((s) => ({ ...s, pushState: initialPushState(max), pushStartingMax: max }));
+    },
+    [update]
+  );
+
+  const completePushSession = useCallback(
+    (session: LoggedSession): { prCount: number } => {
+      let prCount = 0;
+      update((s) => {
+        if (!s.pushState) return s;
+        const out = applyPushResult(s.pushState, session, s.prs);
+        prCount = out.newPrs.length;
+        return {
+          ...s,
+          pushState: out.state,
+          pushSessions: [...s.pushSessions, session],
+          prs: [...s.prs, ...out.newPrs],
+          pushLifetimeReps: s.pushLifetimeReps + out.repsDone,
+        };
+      });
+      return { prCount };
+    },
+    [update]
+  );
+
+  // push history edits: sessions are the source of truth, replay everything
+  const pushRebuilt = (s: Store, sessions: LoggedSession[], trash: LoggedSession[]): Store => {
+    if (!s.pushState) return { ...s, pushSessions: sessions, pushTrash: trash };
+    const replayed = replayPushAll(s.pushStartingMax || s.pushState.bestMaxSet, sessions);
+    return {
+      ...s,
+      pushSessions: sessions,
+      pushTrash: trash,
+      pushState: replayed.state,
+      prs: [...s.prs.filter((p) => p.kind !== 'pushMax'), ...replayed.prs],
+      pushLifetimeReps: replayed.lifetimeReps,
+    };
+  };
+
+  const editPushSession = useCallback(
+    (session: LoggedSession) => {
+      update((s) => {
+        const exists = s.pushSessions.some((x) => x.id === session.id);
+        const sessions = exists
+          ? s.pushSessions.map((x) => (x.id === session.id ? session : x))
+          : [...s.pushSessions, session];
+        sessions.sort((a, b) => a.date.localeCompare(b.date));
+        return pushRebuilt(s, sessions, s.pushTrash);
+      });
+    },
+    [update]
+  );
+
+  const deletePushSession = useCallback(
+    (id: string) => {
+      update((s) => {
+        const target = s.pushSessions.find((x) => x.id === id);
+        if (!target) return s;
+        return pushRebuilt(
+          s,
+          s.pushSessions.filter((x) => x.id !== id),
+          [target, ...s.pushTrash].slice(0, 20)
+        );
+      });
+    },
+    [update]
+  );
+
+  const restorePushSession = useCallback(
+    (id: string) => {
+      update((s) => {
+        const target = s.pushTrash.find((x) => x.id === id);
+        if (!target) return s;
+        const sessions = [...s.pushSessions, target].sort((a, b) => a.date.localeCompare(b.date));
+        return pushRebuilt(s, sessions, s.pushTrash.filter((x) => x.id !== id));
+      });
+    },
+    [update]
+  );
+
+  const emptyPushTrash = useCallback(() => {
+    update((s) => ({ ...s, pushTrash: [] }));
+  }, [update]);
+
   const addRun = useCallback(
     (run: Run) => {
       update((s) => ({ ...s, runs: mergeRuns(s.runs, [run], s.deletedRunIds) }));
@@ -302,6 +396,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         deleteRun,
         syncHealth,
         setAppMode,
+        setPushMax,
+        completePushSession,
+        editPushSession,
+        deletePushSession,
+        restorePushSession,
+        emptyPushTrash,
         importStore,
         resetAll,
         syncNow,

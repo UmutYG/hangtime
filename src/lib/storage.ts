@@ -40,6 +40,11 @@ export function emptyStore(): Store {
     deletedRunIds: [],
     healthEnabled: false,
     appMode: 'pullups',
+    pushState: null,
+    pushStartingMax: 0,
+    pushSessions: [],
+    pushTrash: [],
+    pushLifetimeReps: 0,
   };
 }
 

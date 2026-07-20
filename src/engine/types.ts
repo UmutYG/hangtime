@@ -12,7 +12,15 @@ export type DayKind =
   | 'deloadVolume'
   | 'testBw'
   | 'testWeighted'
-  | 'custom'; // manually logged workout — feeds stats, never advances the cycle
+  | 'custom' // manually logged workout — feeds stats, never advances the cycle
+  // push-up engine days
+  | 'pushPyramid'
+  | 'pushVolume'
+  | 'pushMax'
+  | 'pushLadder'
+  | 'pushDeload'
+  | 'pushTest'
+  | 'pushCustom';
 
 export type Readiness = 'good' | 'ok' | 'rough';
 export type Effort = 'easy' | 'right' | 'grind';
@@ -135,9 +143,19 @@ export interface ProgramState {
 }
 
 export interface PR {
-  kind: 'bwReps' | 'e1rm';
+  kind: 'bwReps' | 'e1rm' | 'pushMax';
   value: number;
   date: ISODate;
+}
+
+/** push-up program position — mirrors the pull-up cycle machinery */
+export interface PushState {
+  bestMaxSet: number;
+  lastTestReps: number;
+  cycle: number;
+  week: 1 | 2 | 3 | 4;
+  sessionInWeek: 1 | 2 | 3;
+  lastSessionDate: ISODate | null;
 }
 
 export interface TestPoint {
@@ -172,7 +190,14 @@ export interface Store {
   /** user has connected Apple Health — auto-sync runs on launch */
   healthEnabled: boolean;
   /** which training space the app is showing */
-  appMode: 'pullups' | 'running';
+  appMode: 'pullups' | 'running' | 'pushups';
+  /** push-up module — null until the user enters their max */
+  pushState: PushState | null;
+  /** the max the user first entered — replay seed for history edits */
+  pushStartingMax: number;
+  pushSessions: LoggedSession[];
+  pushTrash: LoggedSession[];
+  pushLifetimeReps: number;
   /** last local mutation, ISO datetime — drives cloud-sync conflict resolution */
   updatedAt?: string;
 }

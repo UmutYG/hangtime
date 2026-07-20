@@ -34,8 +34,14 @@
       [
         "@kingstinct/react-native-healthkit",
         {
-          "NSHealthShareUsageDescription": "Hangtime reads your running workouts from Apple Health to show them alongside your pull-up training.",
+          "NSHealthShareUsageDescription": "Hangtime reads your running workouts from Apple Health to show them alongside your training.",
           "background": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Hangtime uses your location to track distance and pace while you run — only during a run you start."
         }
       ]
     ]

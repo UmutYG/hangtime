@@ -10,16 +10,25 @@ import { HistoryScreen } from './src/screens/HistoryScreen';
 import { ProgressScreen } from './src/screens/ProgressScreen';
 import { RunsHomeScreen } from './src/screens/RunsHomeScreen';
 import { RunTrendsScreen } from './src/screens/RunTrendsScreen';
+import { PushTodayScreen } from './src/screens/PushTodayScreen';
+import { PushProgressScreen } from './src/screens/PushProgressScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { WorkoutOverlay } from './src/components/WorkoutOverlay';
-import { theme } from './src/theme';
+import { modeAccent, theme } from './src/theme';
 
 // Same 3-slot shell in both spaces; the mode decides labels + screens.
 type Slot = 0 | 1 | 2;
-const MODE_TABS: Record<'pullups' | 'running', { labels: string[]; screens: React.ComponentType[] }> = {
+const MODE_TABS: Record<
+  'pullups' | 'running' | 'pushups',
+  { labels: string[]; screens: React.ComponentType[] }
+> = {
   pullups: {
     labels: ['Today', 'History', 'Progress'],
     screens: [TodayScreen, HistoryScreen, ProgressScreen],
+  },
+  pushups: {
+    labels: ['Today', 'History', 'Progress'],
+    screens: [PushTodayScreen, HistoryScreen, PushProgressScreen],
   },
   running: {
     labels: ['Runs', 'History', 'Trends'],
@@ -63,7 +72,7 @@ function Tabs() {
   const mode = store.appMode;
   const { labels, screens } = MODE_TABS[mode];
   const Screen = screens[active];
-  const accent = mode === 'running' ? theme.run : theme.accent;
+  const accent = modeAccent(mode);
   return (
     <View style={{ flex: 1 }}>
       <Screen />
@@ -74,15 +83,17 @@ function Tabs() {
 
 function WorkoutHost() {
   const workout = useWorkout();
-  const { store, completeSession } = useStore();
+  const { store, completeSession, completePushSession } = useStore();
   if (!workout.activePlan || !store.profile) return <Tabs />;
+  const isPush = workout.activePlan.dayKind.startsWith('push');
   return (
     <WorkoutOverlay
       plan={workout.activePlan}
       profile={store.profile}
       readiness={workout.activeReadiness}
+      accent={isPush ? theme.push : theme.accent}
       onCancel={workout.end}
-      onSave={completeSession}
+      onSave={isPush ? completePushSession : completeSession}
     />
   );
 }

@@ -19,6 +19,13 @@ const DAY_LABEL: Record<string, string> = {
   testBw: 'TEST · PR',
   testWeighted: 'TEST · PR',
   custom: 'MANUAL',
+  pushPyramid: 'PYRAMID',
+  pushVolume: 'VOLUME',
+  pushMax: 'MAX',
+  pushLadder: 'LADDERS',
+  pushDeload: 'DELOAD',
+  pushTest: 'TEST · PR',
+  pushCustom: 'MANUAL',
 };
 const DAY_TITLE: Record<string, string> = {
   calibration: 'Calibration',
@@ -31,6 +38,13 @@ const DAY_TITLE: Record<string, string> = {
   testBw: 'BW max test',
   testWeighted: 'Vest max test',
   custom: 'Logged workout',
+  pushPyramid: 'Pyramid push-ups',
+  pushVolume: 'Volume push-ups',
+  pushMax: 'Max-effort push-ups',
+  pushLadder: 'Push-up ladders',
+  pushDeload: 'Deload push-ups',
+  pushTest: 'Push-up max test',
+  pushCustom: 'Logged push-ups',
 };
 const KIND_COLOR: Record<string, string> = {
   heavy: theme.accent,
@@ -38,6 +52,13 @@ const KIND_COLOR: Record<string, string> = {
   testWeighted: theme.good,
   deloadHeavy: theme.textFaint,
   deloadVolume: theme.textFaint,
+  pushPyramid: theme.push,
+  pushVolume: theme.push,
+  pushMax: theme.push,
+  pushLadder: theme.push,
+  pushTest: theme.good,
+  pushDeload: theme.textFaint,
+  pushCustom: theme.push,
 };
 const RUN_COLOR = theme.run;
 
@@ -59,8 +80,20 @@ type HistoryItem =
   | { kind: 'run'; date: string; run: Run };
 
 export function HistoryScreen() {
-  const { store, editSession, deleteSession, restoreSession, emptyTrash, editRun, addRun, deleteRun } =
-    useStore();
+  const {
+    store,
+    editSession,
+    deleteSession,
+    restoreSession,
+    emptyTrash,
+    editRun,
+    addRun,
+    deleteRun,
+    editPushSession,
+    deletePushSession,
+    restorePushSession,
+    emptyPushTrash,
+  } = useStore();
   const [editing, setEditing] = useState<LoggedSession | null>(null);
   const [editingRun, setEditingRun] = useState<Run | null>(null);
   const [logOpen, setLogOpen] = useState(false);
@@ -74,9 +107,18 @@ export function HistoryScreen() {
     const list: HistoryItem[] =
       mode === 'running'
         ? store.runs.map((r): HistoryItem => ({ kind: 'run', date: r.date, run: r }))
-        : store.sessions.map((s): HistoryItem => ({ kind: 'session', date: s.date, session: s }));
+        : (mode === 'pushups' ? store.pushSessions : store.sessions).map(
+            (s): HistoryItem => ({ kind: 'session', date: s.date, session: s })
+          );
     return list.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 40);
-  }, [store.sessions, store.runs, mode]);
+  }, [store.sessions, store.pushSessions, store.runs, mode]);
+
+  const isPush = mode === 'pushups';
+  const doDeleteSession = isPush ? deletePushSession : deleteSession;
+  const doEditSession = isPush ? editPushSession : editSession;
+  const trashList = isPush ? store.pushTrash : store.trash;
+  const doRestore = isPush ? restorePushSession : restoreSession;
+  const doEmptyTrash = isPush ? emptyPushTrash : emptyTrash;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -87,14 +129,20 @@ export function HistoryScreen() {
           onPress={() => (mode === 'running' ? setRunLogOpen(true) : setLogOpen(true))}
           style={styles.addBtn}
         >
-          <Text style={[styles.addBtnText, mode === 'running' && { color: theme.run }]}>
+          <Text
+            style={[
+              styles.addBtnText,
+              mode === 'running' && { color: theme.run },
+              isPush && { color: theme.push },
+            ]}
+          >
             {mode === 'running' ? '+ Log run' : '+ Log workout'}
           </Text>
         </Pressable>
       </View>
 
       {items.length === 0 ? (
-        <Text style={styles.empty}>{mode === 'running' ? 'Your runs appear here.' : 'Your pull-up sessions appear here.'}</Text>
+        <Text style={styles.empty}>{mode === 'running' ? 'Your runs appear here.' : isPush ? 'Your push-up sessions appear here.' : 'Your pull-up sessions appear here.'}</Text>
       ) : (
         <View style={{ gap: 8 }}>
           {items.map((item) => {
@@ -172,22 +220,22 @@ export function HistoryScreen() {
         </View>
       )}
 
-      {mode === 'pullups' ? (
+      {mode !== 'running' ? (
       <>
       <Pressable onPress={() => setTrashOpen(!trashOpen)} style={styles.trashToggle}>
         <Text style={styles.trashToggleText}>
-          {trashOpen ? 'Hide trash' : `Trash (${store.trash.length})`}
+          {trashOpen ? 'Hide trash' : `Trash (${trashList.length})`}
         </Text>
       </Pressable>
       {trashOpen ? (
         <View style={{ gap: 8 }}>
-          {store.trash.length === 0 ? (
+          {trashList.length === 0 ? (
             <Text style={styles.trashEmpty}>
-              Trash is empty. Deleted pull-up sessions can be recovered here.
+              Trash is empty. Deleted sessions can be recovered here.
             </Text>
           ) : (
             <>
-              {store.trash.map((s) => (
+              {trashList.map((s) => (
                 <View key={s.id} style={styles.trashRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.title}>{DAY_TITLE[s.dayKind] ?? s.dayKind}</Text>
@@ -195,12 +243,12 @@ export function HistoryScreen() {
                       {fmtDate(s.date)} · {detailFor(s)}
                     </Text>
                   </View>
-                  <Pressable onPress={() => restoreSession(s.id)} style={styles.restoreBtn}>
+                  <Pressable onPress={() => doRestore(s.id)} style={styles.restoreBtn}>
                     <Text style={styles.restoreText}>Restore</Text>
                   </Pressable>
                 </View>
               ))}
-              <Pressable onPress={emptyTrash} style={{ alignItems: 'center', paddingVertical: 8 }}>
+              <Pressable onPress={doEmptyTrash} style={{ alignItems: 'center', paddingVertical: 8 }}>
                 <Text style={styles.emptyTrash}>Empty trash</Text>
               </Pressable>
             </>
@@ -212,20 +260,21 @@ export function HistoryScreen() {
 
       <ManualLog
         visible={logOpen}
-        defaultLoadKg={profile.equipment.fixedLoadKg}
+        defaultLoadKg={isPush ? 0 : profile.equipment.fixedLoadKg}
         onClose={() => setLogOpen(false)}
         onSave={(session) => {
-          editSession(session);
+          if (isPush) doEditSession({ ...session, dayKind: 'pushCustom' });
+          else doEditSession(session);
           setLogOpen(false);
         }}
       />
       <ManualLog
         visible={editing !== null}
-        defaultLoadKg={profile.equipment.fixedLoadKg}
+        defaultLoadKg={isPush ? 0 : profile.equipment.fixedLoadKg}
         initial={editing ?? undefined}
         onClose={() => setEditing(null)}
         onSave={(session) => {
-          editSession(session);
+          doEditSession(session);
           setEditing(null);
         }}
       />
