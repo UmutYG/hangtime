@@ -171,6 +171,8 @@ export interface Store {
   deletedRunIds: string[];
   /** user has connected Apple Health — auto-sync runs on launch */
   healthEnabled: boolean;
+  /** which training space the app is showing */
+  appMode: 'pullups' | 'running';
   /** last local mutation, ISO datetime — drives cloud-sync conflict resolution */
   updatedAt?: string;
 }

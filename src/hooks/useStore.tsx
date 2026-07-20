@@ -31,6 +31,7 @@ interface StoreApi {
   deleteRun: (id: string) => void;
   /** connect + pull runs from Apple Health; 'unavailable' in Expo Go / web */
   syncHealth: () => Promise<{ added: number } | 'unavailable' | 'denied'>;
+  setAppMode: (mode: Store['appMode']) => void;
   importStore: (json: string) => boolean;
   resetAll: () => void;
   syncNow: () => Promise<void>;
@@ -184,6 +185,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     update((s) => ({ ...s, trash: [] }));
   }, [update]);
 
+  const setAppMode = useCallback(
+    (mode: Store['appMode']) => {
+      update((s) => ({ ...s, appMode: mode }));
+    },
+    [update]
+  );
+
   const addRun = useCallback(
     (run: Run) => {
       update((s) => ({ ...s, runs: mergeRuns(s.runs, [run], s.deletedRunIds) }));
@@ -293,6 +301,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         editRun,
         deleteRun,
         syncHealth,
+        setAppMode,
         importStore,
         resetAll,
         syncNow,

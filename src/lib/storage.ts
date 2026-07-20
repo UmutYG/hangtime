@@ -39,6 +39,7 @@ export function emptyStore(): Store {
     runs: [],
     deletedRunIds: [],
     healthEnabled: false,
+    appMode: 'pullups',
   };
 }
 

@@ -5,8 +5,8 @@ import { computeGoals } from '../engine/goals';
 import { e1rmSystem } from '../engine/epley';
 import { theme, mono, type } from '../theme';
 import { TrendChart, Point } from '../components/TrendChart';
-import { RunningCard } from '../components/RunningCard';
 import { SettingsSheet } from '../components/SettingsSheet';
+import { ModeSwitch } from '../components/ModeSwitch';
 
 type Metric = 'e1rm' | 'bwMax';
 type Range = '1m' | '3m' | 'all';
@@ -78,6 +78,7 @@ export function ProgressScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <ModeSwitch />
       <View style={styles.headerRow}>
         <Text style={type.hero}>Progress</Text>
         <Pressable onPress={() => setSettingsOpen(true)} style={styles.gearBtn} hitSlop={10}>
@@ -116,8 +117,6 @@ export function ProgressScreen() {
           ))}
         </View>
       </View>
-
-      <RunningCard width={chartWidth} />
 
       <View style={styles.card}>
         <Text style={type.kickerDim}>GOALS</Text>

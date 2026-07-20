@@ -9,6 +9,7 @@ import { WhyCard } from '../components/WhyCard';
 import { WhySheet } from '../components/WhySheet';
 import { ManualLog } from '../components/ManualLog';
 import { ProgressRing } from '../components/ProgressRing';
+import { ModeSwitch } from '../components/ModeSwitch';
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -68,6 +69,7 @@ export function TodayScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <ModeSwitch />
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.dateLabel}>{todayLabel()}</Text>

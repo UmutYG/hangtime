@@ -8,19 +8,36 @@ import { WorkoutProvider, useWorkout } from './src/hooks/useWorkout';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { ProgressScreen } from './src/screens/ProgressScreen';
+import { RunsHomeScreen } from './src/screens/RunsHomeScreen';
+import { RunTrendsScreen } from './src/screens/RunTrendsScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { WorkoutOverlay } from './src/components/WorkoutOverlay';
 import { theme } from './src/theme';
 
-type TabName = 'Today' | 'History' | 'Progress';
-const TABS: TabName[] = ['Today', 'History', 'Progress'];
-const SCREENS: Record<TabName, React.ComponentType> = {
-  Today: TodayScreen,
-  History: HistoryScreen,
-  Progress: ProgressScreen,
+// Same 3-slot shell in both spaces; the mode decides labels + screens.
+type Slot = 0 | 1 | 2;
+const MODE_TABS: Record<'pullups' | 'running', { labels: string[]; screens: React.ComponentType[] }> = {
+  pullups: {
+    labels: ['Today', 'History', 'Progress'],
+    screens: [TodayScreen, HistoryScreen, ProgressScreen],
+  },
+  running: {
+    labels: ['Runs', 'History', 'Trends'],
+    screens: [RunsHomeScreen, HistoryScreen, RunTrendsScreen],
+  },
 };
 
-function TabBar({ active, onChange }: { active: TabName; onChange: (t: TabName) => void }) {
+function TabBar({
+  labels,
+  active,
+  accent,
+  onChange,
+}: {
+  labels: string[];
+  active: Slot;
+  accent: string;
+  onChange: (t: Slot) => void;
+}) {
   const insets = useSafeAreaInsets();
   return (
     <BlurView
@@ -28,11 +45,11 @@ function TabBar({ active, onChange }: { active: TabName; onChange: (t: TabName) 
       tint="light"
       style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 14) }]}
     >
-      {TABS.map((t) => (
-        <Pressable key={t} onPress={() => onChange(t)} style={styles.tabItem}>
-          <View style={[styles.tabDot, { backgroundColor: active === t ? theme.accent : 'transparent' }]} />
-          <Text style={[styles.tabLabel, { color: active === t ? theme.accent : theme.textFaint }]}>
-            {t}
+      {labels.map((label, i) => (
+        <Pressable key={label} onPress={() => onChange(i as Slot)} style={styles.tabItem}>
+          <View style={[styles.tabDot, { backgroundColor: active === i ? accent : 'transparent' }]} />
+          <Text style={[styles.tabLabel, { color: active === i ? accent : theme.textFaint }]}>
+            {label}
           </Text>
         </Pressable>
       ))}
@@ -41,12 +58,16 @@ function TabBar({ active, onChange }: { active: TabName; onChange: (t: TabName) 
 }
 
 function Tabs() {
-  const [active, setActive] = useState<TabName>('Today');
-  const Screen = SCREENS[active];
+  const { store } = useStore();
+  const [active, setActive] = useState<Slot>(0);
+  const mode = store.appMode;
+  const { labels, screens } = MODE_TABS[mode];
+  const Screen = screens[active];
+  const accent = mode === 'running' ? theme.run : theme.accent;
   return (
     <View style={{ flex: 1 }}>
       <Screen />
-      <TabBar active={active} onChange={setActive} />
+      <TabBar labels={labels} active={active} accent={accent} onChange={setActive} />
     </View>
   );
 }

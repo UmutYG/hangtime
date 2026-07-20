@@ -6,7 +6,7 @@ import { useStore } from '../hooks/useStore';
 import { theme, mono, type } from '../theme';
 import { ManualLog } from '../components/ManualLog';
 import { RunLog } from '../components/RunLog';
-import { Sheet } from '../components/Sheet';
+import { ModeSwitch } from '../components/ModeSwitch';
 
 const DAY_LABEL: Record<string, string> = {
   calibration: 'CALIBRATION',
@@ -63,32 +63,38 @@ export function HistoryScreen() {
     useStore();
   const [editing, setEditing] = useState<LoggedSession | null>(null);
   const [editingRun, setEditingRun] = useState<Run | null>(null);
-  const [chooserOpen, setChooserOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const [runLogOpen, setRunLogOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
 
   const profile = store.profile!;
+  const mode = store.appMode;
 
   const items = useMemo((): HistoryItem[] => {
-    const list: HistoryItem[] = [
-      ...store.sessions.map((s): HistoryItem => ({ kind: 'session', date: s.date, session: s })),
-      ...store.runs.map((r): HistoryItem => ({ kind: 'run', date: r.date, run: r })),
-    ];
+    const list: HistoryItem[] =
+      mode === 'running'
+        ? store.runs.map((r): HistoryItem => ({ kind: 'run', date: r.date, run: r }))
+        : store.sessions.map((s): HistoryItem => ({ kind: 'session', date: s.date, session: s }));
     return list.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 40);
-  }, [store.sessions, store.runs]);
+  }, [store.sessions, store.runs, mode]);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <ModeSwitch />
       <View style={styles.headerRow}>
         <Text style={type.hero}>History</Text>
-        <Pressable onPress={() => setChooserOpen(true)} style={styles.addBtn}>
-          <Text style={styles.addBtnText}>+ Log</Text>
+        <Pressable
+          onPress={() => (mode === 'running' ? setRunLogOpen(true) : setLogOpen(true))}
+          style={styles.addBtn}
+        >
+          <Text style={[styles.addBtnText, mode === 'running' && { color: theme.run }]}>
+            {mode === 'running' ? '+ Log run' : '+ Log workout'}
+          </Text>
         </Pressable>
       </View>
 
       {items.length === 0 ? (
-        <Text style={styles.empty}>Your workouts and runs appear here.</Text>
+        <Text style={styles.empty}>{mode === 'running' ? 'Your runs appear here.' : 'Your pull-up sessions appear here.'}</Text>
       ) : (
         <View style={{ gap: 8 }}>
           {items.map((item) => {
@@ -166,6 +172,8 @@ export function HistoryScreen() {
         </View>
       )}
 
+      {mode === 'pullups' ? (
+      <>
       <Pressable onPress={() => setTrashOpen(!trashOpen)} style={styles.trashToggle}>
         <Text style={styles.trashToggleText}>
           {trashOpen ? 'Hide trash' : `Trash (${store.trash.length})`}
@@ -199,32 +207,8 @@ export function HistoryScreen() {
           )}
         </View>
       ) : null}
-
-      {/* what kind of entry? */}
-      <Sheet visible={chooserOpen} onClose={() => setChooserOpen(false)} title="Log">
-        <Pressable
-          onPress={() => {
-            setChooserOpen(false);
-            setLogOpen(true);
-          }}
-          style={styles.chooseRow}
-        >
-          <Text style={[styles.chooseKind, { color: theme.accent }]}>PULL-UPS</Text>
-          <Text style={styles.chooseTitle}>Pull-up workout</Text>
-          <Text style={styles.chooseMeta}>Sets and reps, done outside the app</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => {
-            setChooserOpen(false);
-            setRunLogOpen(true);
-          }}
-          style={styles.chooseRow}
-        >
-          <Text style={[styles.chooseKind, { color: RUN_COLOR }]}>RUNNING</Text>
-          <Text style={styles.chooseTitle}>Run</Text>
-          <Text style={styles.chooseMeta}>Distance and time — Health-synced runs import automatically</Text>
-        </Pressable>
-      </Sheet>
+      </>
+      ) : null}
 
       <ManualLog
         visible={logOpen}
@@ -329,15 +313,4 @@ const styles = StyleSheet.create({
   restoreText: { color: theme.accent, fontSize: 12.5, fontWeight: '600' },
   trashEmpty: { color: theme.textFaint, fontSize: 12.5, textAlign: 'center', paddingVertical: 8 },
   emptyTrash: { color: theme.danger, fontSize: 12 },
-  chooseRow: {
-    backgroundColor: theme.card,
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: theme.radiusLg,
-    padding: 16,
-    marginBottom: 10,
-  },
-  chooseKind: { fontSize: 10.5, fontWeight: '700', letterSpacing: 0.8 },
-  chooseTitle: { fontSize: 16, fontWeight: '700', color: theme.text, marginTop: 4 },
-  chooseMeta: { fontSize: 12.5, color: theme.textFaint, marginTop: 2 },
 });

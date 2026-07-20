@@ -1,88 +1,97 @@
 import { Platform } from 'react-native';
 import { normalizeDistanceKm, Run } from '../engine/runs';
 
-// Apple Health bridge via react-native-health. The native module only exists
-// in real builds (TestFlight / dev-client) — in Expo Go the require fails and
-// the running module degrades to manual logging.
+// Apple Health bridge via @kingstinct/react-native-healthkit (new-architecture
+// native module). Only exists in real builds (TestFlight / dev-client) — in
+// Expo Go the require fails and the running module degrades to manual logging.
 
-let AppleHealthKit: any = null;
+let HK: any = null;
 try {
   if (Platform.OS === 'ios') {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require('react-native-health');
-    AppleHealthKit = mod.default ?? mod;
+    HK = require('@kingstinct/react-native-healthkit');
   }
 } catch {
-  AppleHealthKit = null;
+  HK = null;
 }
 
 export function isHealthModuleAvailable(): boolean {
-  return AppleHealthKit !== null && typeof AppleHealthKit.initHealthKit === 'function';
+  try {
+    return (
+      HK !== null &&
+      typeof HK.queryWorkoutSamples === 'function' &&
+      HK.isHealthDataAvailable() === true
+    );
+  } catch {
+    return false;
+  }
 }
 
-const PERMS = () => ({
-  permissions: {
-    read: [
-      AppleHealthKit.Constants.Permissions.Workout,
-      AppleHealthKit.Constants.Permissions.DistanceWalkingRunning,
-      AppleHealthKit.Constants.Permissions.HeartRate,
-      AppleHealthKit.Constants.Permissions.ActiveEnergyBurned,
-    ],
-    write: [],
-  },
-});
 
 /** Ask the user for read access (iOS shows the Health permission sheet once). */
-export function requestHealthAuth(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (!isHealthModuleAvailable()) return resolve(false);
-    try {
-      AppleHealthKit.initHealthKit(PERMS(), (error: unknown) => resolve(!error));
-    } catch {
-      resolve(false);
-    }
-  });
+export async function requestHealthAuth(): Promise<boolean> {
+  if (!isHealthModuleAvailable()) return false;
+  try {
+    return (
+      (await HK.requestAuthorization({
+        toRead: [
+          'HKWorkoutTypeIdentifier',
+          'HKQuantityTypeIdentifierDistanceWalkingRunning',
+          'HKQuantityTypeIdentifierHeartRate',
+          'HKQuantityTypeIdentifierActiveEnergyBurned',
+        ],
+      })) === true
+    );
+  } catch {
+    return false;
+  }
 }
 
-const RUNNING_NAMES = new Set(['Running', 'RunningSand', 'RunningTreadmill']);
+const RUNNING_ACTIVITY = 37; // WorkoutActivityType.running
+
+/** distance Quantity → km, trusting the unit string when present */
+function quantityToKm(q: { unit?: string; quantity?: number } | undefined): number {
+  if (!q || !Number.isFinite(q.quantity)) return 0;
+  const v = Number(q.quantity);
+  const unit = (q.unit ?? '').toLowerCase();
+  if (unit === 'km') return Math.round(v * 100) / 100;
+  if (unit === 'm') return Math.round((v / 1000) * 100) / 100;
+  if (unit === 'mi') return Math.round(v * 1.60934 * 100) / 100;
+  return normalizeDistanceKm(v); // unknown unit → size heuristic
+}
 
 /** All running workouts in Health (any source app), mapped to our Run shape. */
-export function fetchRunsFromHealth(): Promise<Run[]> {
-  return new Promise((resolve) => {
-    if (!isHealthModuleAvailable()) return resolve([]);
-    const options = {
-      startDate: new Date(2000, 0, 1).toISOString(),
-      endDate: new Date().toISOString(),
-      type: 'Workout',
-    };
-    try {
-      AppleHealthKit.getSamples(options, (error: unknown, results: any[]) => {
-        if (error || !Array.isArray(results)) return resolve([]);
-        const runs: Run[] = [];
-        for (const w of results) {
-          const activity = String(w.activityName ?? w.activityId ?? '');
-          if (!RUNNING_NAMES.has(activity)) continue;
-          const start = w.start ?? w.startDate;
-          const end = w.end ?? w.endDate;
-          if (!start || !end) continue;
-          const durationSec = Math.round(
-            (new Date(end).getTime() - new Date(start).getTime()) / 1000
-          );
-          const distanceKm = normalizeDistanceKm(Number(w.distance ?? 0));
-          if (durationSec < 120 || distanceKm < 0.3) continue; // ignore noise
-          runs.push({
-            id: String(w.id ?? `${start}-${distanceKm}`),
-            date: String(start).slice(0, 10),
-            distanceKm,
-            durationSec,
-            calories: w.calories ? Math.round(Number(w.calories)) : undefined,
-            source: 'health',
-          });
-        }
-        resolve(runs);
+export async function fetchRunsFromHealth(): Promise<Run[]> {
+  if (!isHealthModuleAvailable()) return [];
+  try {
+    const workouts: any[] = await HK.queryWorkoutSamples({
+      limit: -1,
+      ascending: true,
+      filter: { workoutActivityType: RUNNING_ACTIVITY },
+    });
+    const runs: Run[] = [];
+    for (const w of workouts ?? []) {
+      const start = w.startDate ? new Date(w.startDate) : null;
+      const end = w.endDate ? new Date(w.endDate) : null;
+      if (!start || !end) continue;
+      const durationSec =
+        w.duration && Number.isFinite(w.duration.quantity) && w.duration.unit === 's'
+          ? Math.round(w.duration.quantity)
+          : Math.round((end.getTime() - start.getTime()) / 1000);
+      const distanceKm = quantityToKm(w.totalDistance);
+      if (durationSec < 120 || distanceKm < 0.3) continue; // ignore noise
+      const calories = w.totalEnergyBurned?.quantity;
+      runs.push({
+        id: String(w.uuid ?? `${start.toISOString()}-${distanceKm}`),
+        date: start.toISOString().slice(0, 10),
+        distanceKm,
+        durationSec,
+        calories: Number.isFinite(calories) ? Math.round(Number(calories)) : undefined,
+        source: 'health',
       });
-    } catch {
-      resolve([]);
     }
-  });
+    return runs;
+  } catch {
+    return [];
+  }
 }
