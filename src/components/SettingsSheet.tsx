@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useStore } from '../hooks/useStore';
+import { useWeeklyLoad } from '../hooks/useReadiness';
 import { exportJson } from '../lib/storage';
 import { theme, mono } from '../theme';
 import { Sheet } from './Sheet';
@@ -29,6 +30,7 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
 
   const profile = store.profile!;
   const s = store.state;
+  const week = useWeeklyLoad();
 
   const doExport = async () => {
     const json = exportJson(store);
@@ -134,7 +136,41 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
       ) : null}
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Where you are</Text>
+        <Text style={styles.cardTitle}>Your training spaces</Text>
+        <View style={styles.modeRow}>
+          <View style={[styles.modeDot, { backgroundColor: theme.accent }]} />
+          <Text style={styles.modeName}>Pull-ups</Text>
+          <Text style={[styles.modeMeta, mono]}>{week.pull} load · 7d</Text>
+        </View>
+        <View style={styles.modeRow}>
+          <View style={[styles.modeDot, { backgroundColor: theme.push }]} />
+          <Text style={styles.modeName}>Push-ups</Text>
+          <Text style={[styles.modeMeta, mono]}>
+            {store.pushState ? `${week.push} load · 7d` : 'not set up'}
+          </Text>
+        </View>
+        <View style={styles.modeRow}>
+          <View style={[styles.modeDot, { backgroundColor: theme.run }]} />
+          <Text style={styles.modeName}>Running</Text>
+          <Text style={[styles.modeMeta, mono]}>{week.run} load · 7d</Text>
+        </View>
+        <Text style={styles.cardBody}>
+          Readiness in each space accounts for all three — pull and push are opposite movements, so
+          they share recovery rather than muscles.
+        </Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Body readiness</Text>
+        <Text style={styles.cardBody}>
+          {store.externalReadiness
+            ? `${store.externalReadiness.source}: ${store.externalReadiness.score}/100, blended into every readiness score.`
+            : 'No wearable connected. Oura and Whoop slot straight into the readiness engine when you add one — the plumbing is already built.'}
+        </Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Pull-up program</Text>
         <Text style={styles.cardBody}>
           Cycle {s.cycle} · week {s.week} · training load{' '}
           <Text style={mono}>
@@ -215,6 +251,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   smallBtnText: { color: theme.text, fontSize: 13, fontWeight: '600' },
+  modeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 },
+  modeDot: { width: 8, height: 8, borderRadius: 4 },
+  modeName: { flex: 1, fontSize: 13.5, color: theme.text, fontWeight: '600' },
+  modeMeta: { fontSize: 12, color: theme.textFaint },
   dangerBtn: { alignItems: 'center', paddingVertical: 10 },
   dangerText: { color: theme.danger, fontSize: 13 },
 });

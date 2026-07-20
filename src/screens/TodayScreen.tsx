@@ -10,6 +10,8 @@ import { WhySheet } from '../components/WhySheet';
 import { ManualLog } from '../components/ManualLog';
 import { ProgressRing } from '../components/ProgressRing';
 import { ModeSwitch } from '../components/ModeSwitch';
+import { ReadinessCard } from '../components/ReadinessCard';
+import { useReadiness } from '../hooks/useReadiness';
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -33,9 +35,12 @@ export function TodayScreen() {
   const { editSession } = useStore();
 
   const profile = store.profile!;
+  const readinessInfo = useReadiness('pull');
+  // the engine suggests; you always have the final tap
+  const effectiveReadiness = readiness ?? readinessInfo.suggestion;
   const plan = useMemo(
-    () => generateSession(profile, store.state, todayIso(), readiness),
-    [profile, store.state, readiness]
+    () => generateSession(profile, store.state, todayIso(), effectiveReadiness),
+    [profile, store.state, effectiveReadiness]
   );
 
   const doneToday = store.sessions.some((s) => s.date === todayIso() && s.dayKind !== 'custom');
@@ -81,6 +86,8 @@ export function TodayScreen() {
           </Text>
         </View>
       </View>
+
+      <ReadinessCard readiness={readinessInfo} accent={theme.accent} />
 
       {doneToday ? (
         <View style={styles.card}>
@@ -140,7 +147,7 @@ export function TodayScreen() {
           </View>
 
           <Pressable
-            onPress={() => workout.start(plan, readiness)}
+            onPress={() => workout.start(plan, effectiveReadiness)}
             style={styles.startBtn}
           >
             <Text style={styles.startBtnText}>Start session</Text>

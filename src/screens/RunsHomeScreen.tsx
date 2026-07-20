@@ -7,6 +7,8 @@ import { ModeSwitch } from '../components/ModeSwitch';
 import { WeeklyBars } from '../components/WeeklyBars';
 import { RunLog } from '../components/RunLog';
 import { RunTracker } from '../components/RunTracker';
+import { ReadinessCard } from '../components/ReadinessCard';
+import { useReadiness } from '../hooks/useReadiness';
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -28,6 +30,7 @@ export function RunsHomeScreen() {
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
+  const readinessInfo = useReadiness('run');
   const stats = useMemo(() => runStats(store.runs, todayIso()), [store.runs]);
   const weekly = useMemo(() => weeklyKmSeries(store.runs, todayIso(), 8), [store.runs]);
   const recent = useMemo(() => [...store.runs].reverse().slice(0, 5), [store.runs]);
@@ -59,6 +62,8 @@ export function RunsHomeScreen() {
           <Text style={type.hero}>Runs</Text>
         </View>
       </View>
+
+      <ReadinessCard readiness={readinessInfo} accent={theme.run} />
 
       {store.runs.length === 0 ? (
         <View style={styles.card}>

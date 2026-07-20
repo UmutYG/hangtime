@@ -198,6 +198,8 @@ export interface Store {
   pushSessions: LoggedSession[];
   pushTrash: LoggedSession[];
   pushLifetimeReps: number;
+  /** latest wearable readiness (Oura / Whoop / …) — slot ready, provider later */
+  externalReadiness?: import('./load').ExternalReadiness | null;
   /** last local mutation, ISO datetime — drives cloud-sync conflict resolution */
   updatedAt?: string;
 }

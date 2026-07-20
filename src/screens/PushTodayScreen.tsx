@@ -8,6 +8,8 @@ import { theme, mono, type } from '../theme';
 import { ModeSwitch } from '../components/ModeSwitch';
 import { ProgressRing } from '../components/ProgressRing';
 import { Sheet } from '../components/Sheet';
+import { ReadinessCard } from '../components/ReadinessCard';
+import { useReadiness } from '../hooks/useReadiness';
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -30,10 +32,12 @@ export function PushTodayScreen() {
   const [maxText, setMaxText] = useState('');
 
   const push = store.pushState;
+  const readinessInfo = useReadiness('push');
+  const effectiveReadiness = readiness ?? readinessInfo.suggestion;
 
   const plan = useMemo(
-    () => (push ? generatePushSession(push, readiness) : null),
-    [push, readiness]
+    () => (push ? generatePushSession(push, effectiveReadiness) : null),
+    [push, effectiveReadiness]
   );
 
   const doneToday = store.pushSessions.some(
@@ -109,6 +113,8 @@ export function PushTodayScreen() {
         </View>
       </View>
 
+      <ReadinessCard readiness={readinessInfo} accent={theme.push} />
+
       {doneToday ? (
         <View style={styles.card}>
           <View style={styles.doneRow}>
@@ -146,16 +152,19 @@ export function PushTodayScreen() {
             {READINESS.map((r) => (
               <Pressable
                 key={r.key}
-                onPress={() => setReadiness(readiness === r.key ? undefined : r.key)}
-                style={[styles.readinessChip, readiness === r.key && { backgroundColor: theme.push, borderColor: theme.push }]}
+                onPress={() => setReadiness(r.key)}
+                style={[
+                  styles.readinessChip,
+                  effectiveReadiness === r.key && { backgroundColor: theme.push, borderColor: theme.push },
+                ]}
               >
-                <Text style={[styles.readinessChipText, readiness === r.key && { color: '#FFF' }]}>
+                <Text style={[styles.readinessChipText, effectiveReadiness === r.key && { color: '#FFF' }]}>
                   {r.label}
                 </Text>
               </Pressable>
             ))}
           </View>
-          <Pressable onPress={() => workout.start(plan!, readiness)} style={styles.startBtn}>
+          <Pressable onPress={() => workout.start(plan!, effectiveReadiness)} style={styles.startBtn}>
             <Text style={styles.startBtnText}>Start session</Text>
           </Pressable>
         </View>

@@ -45,6 +45,7 @@ export function emptyStore(): Store {
     pushSessions: [],
     pushTrash: [],
     pushLifetimeReps: 0,
+    externalReadiness: null,
   };
 }
 
