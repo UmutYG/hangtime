@@ -14,7 +14,7 @@ import { PushTodayScreen } from './src/screens/PushTodayScreen';
 import { PushProgressScreen } from './src/screens/PushProgressScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { WorkoutOverlay } from './src/components/WorkoutOverlay';
-import { modeAccent, theme } from './src/theme';
+import { modeAccent, modeIdentity, theme } from './src/theme';
 
 // Same 3-slot shell in both spaces; the mode decides labels + screens.
 type Slot = 0 | 1 | 2;
@@ -74,7 +74,7 @@ function Tabs() {
   const Screen = screens[active];
   const accent = modeAccent(mode);
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: modeIdentity(mode).wash }}>
       <Screen />
       <TabBar labels={labels} active={active} accent={accent} onChange={setActive} />
     </View>

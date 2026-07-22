@@ -4,7 +4,8 @@ import { generateSession } from '../engine/generator';
 import { Readiness } from '../engine/types';
 import { useStore } from '../hooks/useStore';
 import { useWorkout } from '../hooks/useWorkout';
-import { theme, mono, type } from '../theme';
+import { theme, mono, modeIdentity, type } from '../theme';
+import { ModeMark } from '../components/ModeMark';
 import { WhyCard } from '../components/WhyCard';
 import { WhySheet } from '../components/WhySheet';
 import { ManualLog } from '../components/ManualLog';
@@ -86,6 +87,10 @@ export function TodayScreen() {
           </Text>
         </View>
       </View>
+      <View style={styles.mottoRow}>
+        <ModeMark mode="pullups" size={15} color={theme.accent} />
+        <Text style={styles.mottoText}>{modeIdentity('pullups').motto}</Text>
+      </View>
 
       <ReadinessCard readiness={readinessInfo} accent={theme.accent} />
 
@@ -150,7 +155,7 @@ export function TodayScreen() {
             onPress={() => workout.start(plan, effectiveReadiness)}
             style={styles.startBtn}
           >
-            <Text style={styles.startBtnText}>Start session</Text>
+            <Text style={styles.startBtnText}>{modeIdentity('pullups').verb}</Text>
           </Pressable>
         </View>
       )}
@@ -205,9 +210,11 @@ export function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.bg },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: theme.pad, gap: 12, paddingBottom: 120 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  mottoRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -6 },
+  mottoText: { color: theme.textFaint, fontSize: 12.5, fontWeight: '500', letterSpacing: 0.1 },
   dateLabel: { color: theme.textFaint, fontSize: 13, fontWeight: '500' },
   cycleChip: {
     backgroundColor: theme.cardMuted,

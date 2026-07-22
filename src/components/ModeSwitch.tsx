@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useStore } from '../hooks/useStore';
-import { theme } from '../theme';
+import { AppMode, modeIdentity, theme } from '../theme';
 import { HubSheet } from './HubSheet';
+import { ModeMark } from './ModeMark';
+
+const MODES: AppMode[] = ['pullups', 'pushups', 'running'];
 
 // The app-space switcher plus the hub entry — same spot on every screen.
 export function ModeSwitch() {
@@ -12,24 +15,20 @@ export function ModeSwitch() {
   return (
     <View style={styles.row}>
       <View style={styles.wrap}>
-        <Pressable
-          onPress={() => setAppMode('pullups')}
-          style={[styles.seg, mode === 'pullups' && { backgroundColor: theme.accent }]}
-        >
-          <Text style={[styles.text, mode === 'pullups' && styles.textActive]}>Pull-ups</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setAppMode('pushups')}
-          style={[styles.seg, mode === 'pushups' && { backgroundColor: theme.push }]}
-        >
-          <Text style={[styles.text, mode === 'pushups' && styles.textActive]}>Push-ups</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setAppMode('running')}
-          style={[styles.seg, mode === 'running' && { backgroundColor: theme.run }]}
-        >
-          <Text style={[styles.text, mode === 'running' && styles.textActive]}>Running</Text>
-        </Pressable>
+        {MODES.map((m) => {
+          const id = modeIdentity(m);
+          const active = mode === m;
+          return (
+            <Pressable
+              key={m}
+              onPress={() => setAppMode(m)}
+              style={[styles.seg, active && { backgroundColor: id.accent }]}
+            >
+              <ModeMark mode={m} size={14} color={active ? '#FFFFFF' : theme.textFaint} />
+              <Text style={[styles.text, active && styles.textActive]}>{id.name}</Text>
+            </Pressable>
+          );
+        })}
       </View>
       <Pressable onPress={() => setHubOpen(true)} style={styles.hubBtn} hitSlop={8}>
         <Text style={styles.hubIcon}>◱</Text>
@@ -49,7 +48,14 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     padding: 3,
   },
-  seg: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
+  seg: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
   text: { fontSize: 12, fontWeight: '600', color: theme.textDim },
   textActive: { color: '#FFFFFF' },
   hubBtn: {

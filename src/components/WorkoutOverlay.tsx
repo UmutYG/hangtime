@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Effort, LoggedSession, PlannedSet, Profile, SessionPlan } from '../engine/types';
+import { formCueFor } from '../engine/formCues';
 import { theme, mono, type } from '../theme';
 import { ProgressRing } from './ProgressRing';
 
@@ -51,6 +52,11 @@ export function WorkoutOverlay({
   );
   const hasWarmup = plan.sets.some((s) => s.isWarmup);
   const hasWeighted = plan.sets.some((s) => !s.isWarmup && s.loadKg > 0);
+  const modality = plan.dayKind.startsWith('push') ? 'push' : 'pull';
+  const formCue = useMemo(
+    () => formCueFor(modality, plan.cycle * 5 + plan.week * 3 + plan.sessionInWeek),
+    [modality, plan.cycle, plan.week, plan.sessionInWeek]
+  );
 
   const [warmupDone, setWarmupDone] = useState(!hasWarmup);
   const [cursor, setCursor] = useState(0); // index into workingIdx
@@ -201,6 +207,7 @@ export function WorkoutOverlay({
               Next: <Text style={styles.nextUpBold}>{setLabel(currentSet, cursor + 1, workingIdx.length)} — {currentSet.amrap ? `${currentSet.targetReps}+` : currentSet.targetReps} reps{currentSet.loadKg > 0 ? ` · +${currentSet.loadKg} kg` : ''}</Text>
             </Text>
           ) : null}
+          <Text style={styles.formNote}>{formCue}</Text>
           <View style={styles.restBtnRow}>
             <Pressable onPress={() => setRestEndsAt((t) => (t ? t + 30_000 : t))} style={styles.lightBtn}>
               <Text style={styles.lightBtnText}>+30 s</Text>
@@ -344,6 +351,15 @@ const styles = StyleSheet.create({
   ringTime: { fontSize: 44, fontWeight: '600', letterSpacing: -1, color: theme.text },
   nextUp: { fontSize: 13.5, color: theme.textDim, marginTop: 18, textAlign: 'center' },
   nextUpBold: { fontWeight: '700', color: theme.text },
+  formNote: {
+    fontSize: 12,
+    color: theme.textFaint,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 17,
+    marginTop: 14,
+    paddingHorizontal: 20,
+  },
   restBtnRow: { flexDirection: 'row', gap: 10, width: '100%', marginTop: 24 },
   checkCircle: {
     width: 44,

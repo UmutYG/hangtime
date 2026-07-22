@@ -2,8 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { fmtDuration, fmtPace, paceSecPerKm, Run, runStats, weeklyKmSeries } from '../engine/runs';
 import { useStore } from '../hooks/useStore';
-import { theme, mono, type } from '../theme';
+import { theme, mono, modeIdentity, type } from '../theme';
 import { ModeSwitch } from '../components/ModeSwitch';
+import { ModeMark } from '../components/ModeMark';
 import { WeeklyBars } from '../components/WeeklyBars';
 import { RunLog } from '../components/RunLog';
 import { RunTracker } from '../components/RunTracker';
@@ -61,6 +62,10 @@ export function RunsHomeScreen() {
           <Text style={styles.dateLabel}>{todayLabel()}</Text>
           <Text style={type.hero}>Runs</Text>
         </View>
+      </View>
+      <View style={styles.mottoRow}>
+        <ModeMark mode="running" size={15} color={theme.run} />
+        <Text style={styles.mottoText}>{modeIdentity('running').motto}</Text>
       </View>
 
       <ReadinessCard readiness={readinessInfo} accent={theme.run} />
@@ -132,6 +137,7 @@ export function RunsHomeScreen() {
         visible={trackerOpen}
         onClose={() => setTrackerOpen(false)}
         onSave={(run) => addRun(run)}
+        cueSeed={store.runs.length}
       />
       <RunLog
         visible={logOpen}
@@ -155,9 +161,11 @@ export function RunsHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.bg },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: theme.pad, gap: 14, paddingBottom: 120 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  mottoRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -6 },
+  mottoText: { color: theme.textFaint, fontSize: 12.5, fontWeight: '500', letterSpacing: 0.1 },
   dateLabel: { color: theme.textFaint, fontSize: 13, fontWeight: '500' },
   card: {
     backgroundColor: theme.card,

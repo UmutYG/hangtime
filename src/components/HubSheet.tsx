@@ -7,6 +7,7 @@ import { runStats } from '../engine/runs';
 import { useStore } from '../hooks/useStore';
 import { useLoadEntries } from '../hooks/useReadiness';
 import { theme, mono, type } from '../theme';
+import { ModeMark } from './ModeMark';
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -78,7 +79,7 @@ export function HubSheet({ visible, onClose }: { visible: boolean; onClose: () =
           >
             <View style={styles.cardHeader}>
               <View style={styles.nameRow}>
-                <View style={[styles.chip, { backgroundColor: r.color }]} />
+                <ModeMark mode={r.mode} size={18} color={r.color} />
                 <Text style={styles.name}>{r.name}</Text>
               </View>
               <Text style={[styles.readinessScore, mono]}>{r.readiness.score}</Text>

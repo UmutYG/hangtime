@@ -3,6 +3,7 @@ import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Location from 'expo-location';
 import { fmtDuration, fmtPace, Run } from '../engine/runs';
+import { formCueFor } from '../engine/formCues';
 import { theme, mono, type } from '../theme';
 
 // In-app GPS run tracking — no external app needed. V1 tracks while Hangtime
@@ -21,7 +22,15 @@ function haversineM(a: { latitude: number; longitude: number }, b: { latitude: n
 
 type Phase = 'idle' | 'tracking' | 'paused' | 'denied';
 
-function TrackerInner({ onSave, onClose }: { onSave: (run: Run) => void; onClose: () => void }) {
+function TrackerInner({
+  onSave,
+  onClose,
+  cueSeed = 0,
+}: {
+  onSave: (run: Run) => void;
+  onClose: () => void;
+  cueSeed?: number;
+}) {
   useKeepAwake();
   const [phase, setPhase] = useState<Phase>('idle');
   const [distanceM, setDistanceM] = useState(0);
@@ -138,10 +147,13 @@ function TrackerInner({ onSave, onClose }: { onSave: (run: Run) => void; onClose
           </View>
         </View>
         {phase === 'idle' ? (
-          <Text style={styles.hint}>
-            GPS tracking runs inside Hangtime — keep the app open during your run; the screen stays
-            awake automatically.
-          </Text>
+          <>
+            <Text style={styles.hint}>
+              GPS tracking runs inside Hangtime — keep the app open during your run; the screen stays
+              awake automatically.
+            </Text>
+            <Text style={styles.formNote}>{formCueFor('run', cueSeed)}</Text>
+          </>
         ) : null}
         {phase === 'tracking' && !gpsReady ? (
           <Text style={styles.hint}>Acquiring GPS…</Text>
@@ -182,17 +194,19 @@ export function RunTracker({
   visible,
   onSave,
   onClose,
+  cueSeed,
 }: {
   visible: boolean;
   onSave: (run: Run) => void;
   onClose: () => void;
+  cueSeed?: number;
 }) {
   if (Platform.OS === 'web') {
     // web preview: render the same UI; geolocation may prompt in the browser
   }
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <TrackerInner onSave={onSave} onClose={onClose} />
+      <TrackerInner onSave={onSave} onClose={onClose} cueSeed={cueSeed} />
     </Modal>
   );
 }
@@ -215,6 +229,15 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     paddingHorizontal: 24,
     marginTop: 24,
+  },
+  formNote: {
+    fontSize: 12,
+    color: theme.textFaint,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 17,
+    paddingHorizontal: 24,
+    marginTop: 14,
   },
   startBtn: {
     backgroundColor: theme.run,

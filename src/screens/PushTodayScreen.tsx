@@ -4,8 +4,9 @@ import { computePushGoal, generatePushSession } from '../engine/pushups';
 import { Readiness } from '../engine/types';
 import { useStore } from '../hooks/useStore';
 import { useWorkout } from '../hooks/useWorkout';
-import { theme, mono, type } from '../theme';
+import { theme, mono, modeIdentity, type } from '../theme';
 import { ModeSwitch } from '../components/ModeSwitch';
+import { ModeMark } from '../components/ModeMark';
 import { ProgressRing } from '../components/ProgressRing';
 import { Sheet } from '../components/Sheet';
 import { ReadinessCard } from '../components/ReadinessCard';
@@ -112,6 +113,10 @@ export function PushTodayScreen() {
           </Text>
         </View>
       </View>
+      <View style={styles.mottoRow}>
+        <ModeMark mode="pushups" size={15} color={theme.push} />
+        <Text style={styles.mottoText}>{modeIdentity('pushups').motto}</Text>
+      </View>
 
       <ReadinessCard readiness={readinessInfo} accent={theme.push} />
 
@@ -165,7 +170,7 @@ export function PushTodayScreen() {
             ))}
           </View>
           <Pressable onPress={() => workout.start(plan!, effectiveReadiness)} style={styles.startBtn}>
-            <Text style={styles.startBtnText}>Start session</Text>
+            <Text style={styles.startBtnText}>{modeIdentity('pushups').verb}</Text>
           </Pressable>
         </View>
       )}
@@ -209,9 +214,11 @@ export function PushTodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.bg },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: theme.pad, gap: 12, paddingBottom: 120 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  mottoRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -6 },
+  mottoText: { color: theme.textFaint, fontSize: 12.5, fontWeight: '500', letterSpacing: 0.1 },
   dateLabel: { color: theme.textFaint, fontSize: 13, fontWeight: '500' },
   cycleChip: {
     backgroundColor: theme.cardMuted,

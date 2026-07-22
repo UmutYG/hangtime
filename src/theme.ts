@@ -41,6 +41,47 @@ export function modeAccent(mode: 'pullups' | 'running' | 'pushups'): string {
   return theme.accent;
 }
 
+export type AppMode = 'pullups' | 'pushups' | 'running';
+
+export interface ModeIdentity {
+  accent: string;
+  /** ambient screen background — each space has its own air, not just its own paint */
+  wash: string;
+  name: string;
+  /** the character of the movement, one line */
+  motto: string;
+  /** what the start button says — the movement's own invitation */
+  verb: string;
+}
+
+const IDENTITY: Record<AppMode, ModeIdentity> = {
+  pullups: {
+    accent: theme.accent,
+    wash: '#FAF8F3',
+    name: 'Pull-ups',
+    motto: 'You and gravity, eye to eye.',
+    verb: 'Grab the bar',
+  },
+  pushups: {
+    accent: theme.push,
+    wash: '#F8F6FA',
+    name: 'Push-ups',
+    motto: 'Press the ground away.',
+    verb: 'Hit the floor',
+  },
+  running: {
+    accent: theme.run,
+    wash: '#F4F7FA',
+    name: 'Running',
+    motto: 'Forward, one stride at a time.',
+    verb: 'Start run',
+  },
+};
+
+export function modeIdentity(mode: AppMode): ModeIdentity {
+  return IDENTITY[mode];
+}
+
 export const type = {
   hero: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5, color: theme.text } as TextStyle,
   title: { fontSize: 19, fontWeight: '700', letterSpacing: -0.2, color: theme.text } as TextStyle,
