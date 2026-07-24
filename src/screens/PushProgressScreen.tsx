@@ -6,6 +6,7 @@ import { theme, mono, type } from '../theme';
 import { ModeSwitch } from '../components/ModeSwitch';
 import { TrendChart, Point } from '../components/TrendChart';
 import { SettingsSheet } from '../components/SettingsSheet';
+import { MasteryPath } from '../components/MasteryPath';
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -95,6 +96,8 @@ export function PushProgressScreen() {
           <Text style={styles.goalLine}>All milestones cleared — 100+ club.</Text>
         )}
       </View>
+
+      <MasteryPath sessions={store.pushSessions} />
 
       <View style={styles.card}>
         <Text style={[type.kickerDim, { color: theme.push }]}>PERSONAL RECORDS</Text>

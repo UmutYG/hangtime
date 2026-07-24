@@ -49,6 +49,7 @@ export interface PlannedSet {
   isWarmup?: boolean;
   restSecAfter: number;
   ladder?: { ladderIndex: number; rung: number };
+  variation?: { key: string; name: string; flavor?: string };
   note?: string;
 }
 
@@ -98,6 +99,8 @@ export interface SetLog {
   actualReps: number;
   loadKg: number;
   isWarmup?: boolean;
+  /** push-up variation key; absent on legacy logs and standard sets → counts as 'standard' */
+  variationKey?: string;
 }
 
 export interface LoggedSession {

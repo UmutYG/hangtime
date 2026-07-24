@@ -19,8 +19,10 @@ function fmtTime(sec: number): string {
 }
 
 function setLabel(set: PlannedSet, workingIndex: number, total: number): string {
-  if (set.ladder) return `Ladder ${set.ladder.ladderIndex} · Rung ${set.ladder.rung}`;
-  return `Set ${workingIndex} of ${total}`;
+  const base = set.ladder
+    ? `Ladder ${set.ladder.ladderIndex} · Rung ${set.ladder.rung}`
+    : `Set ${workingIndex} of ${total}`;
+  return set.variation ? `${base} · ${set.variation.name}` : base;
 }
 
 const RING_CIRC = 2 * Math.PI * ((180 - 7) / 2);
@@ -108,7 +110,13 @@ export function WorkoutOverlay({
     setActuals((a) => ({ ...a, [i]: curReps }));
     const isLastWorking = cursor === workingIdx.length - 1;
     const rest = plan.sets[i].restSecAfter;
-    if (!isLastWorking && rest > 0) setRestEndsAt(Date.now() + rest * 1000);
+    if (!isLastWorking && rest > 0) {
+      // seed `now` alongside restEndsAt — a stale `now` from the previous rest
+      // makes the first frame show an inflated countdown until the next tick
+      const t = Date.now();
+      setNow(t);
+      setRestEndsAt(t + rest * 1000);
+    }
     setCursor((c) => c + 1);
   };
 
@@ -126,6 +134,7 @@ export function WorkoutOverlay({
       actualReps: actuals[i] ?? s.targetReps,
       loadKg: s.loadKg,
       isWarmup: s.isWarmup,
+      variationKey: s.variation?.key,
     })),
   });
 
@@ -239,6 +248,9 @@ export function WorkoutOverlay({
             target {currentSet.amrap ? `${currentSet.targetReps}+` : currentSet.targetReps}
             {currentSet.loadKg > 0 ? ` · +${currentSet.loadKg} kg` : ''}
           </Text>
+          {currentSet.variation?.flavor ? (
+            <Text style={styles.formNote}>{currentSet.variation.flavor}</Text>
+          ) : null}
           <Pressable onPress={logSet} style={[styles.accentBtn, { backgroundColor: accent }]}>
             <Text style={styles.accentBtnText}>Log set</Text>
           </Pressable>

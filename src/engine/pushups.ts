@@ -59,6 +59,40 @@ export function pushVariationFor(state: PushState, slot: number = 0): PushVariat
   return pool[idx];
 }
 
+// ——— volume-day grip blocks ———
+// Simple grip/stance changes only: nothing that turns a rhythm day into a
+// skill session. The fancy shapes live on ladder day, one per ladder.
+export const PUSH_SIMPLE_KEYS = ['standard', 'wide', 'diamond', 'staggered'] as const;
+
+export interface PushVolumeBlock {
+  variation: PushVariation;
+  /** contiguous sets in this block */
+  sets: number;
+  /** per-set target, scale-adjusted from the same 50%-of-max base */
+  reps: number;
+}
+
+/** Split a volume day into 2–3 contiguous grip blocks, deterministically. */
+export function pushVolumeBlocks(state: PushState, totalSets: number, bestMax: number): PushVolumeBlock[] {
+  const simplePool = PUSH_SIMPLE_KEYS.map((k) => PUSH_VARIATIONS.find((v) => v.key === k)!);
+  const seed = state.cycle * 5 + state.week * 3 + state.sessionInWeek;
+  const blockCount = 2 + (seed % 2);
+  const base = Math.floor(totalSets / blockCount);
+  const remainder = totalSets % blockCount;
+  // start/step both derived from the seed; step 1 or 3 is coprime with 4,
+  // so blocks within one session never repeat a grip
+  const start = seed % simplePool.length;
+  const step = seed % 2 === 0 ? 1 : 3;
+  return Array.from({ length: blockCount }, (_, b) => {
+    const variation = simplePool[(start + b * step) % simplePool.length];
+    return {
+      variation,
+      sets: base + (b < remainder ? 1 : 0),
+      reps: Math.max(3, Math.ceil(bestMax * PUSH_VOLUME_PCT * variation.scale)),
+    };
+  });
+}
+
 export function initialPushState(startingMax: number): PushState {
   return {
     bestMaxSet: startingMax,
@@ -99,13 +133,14 @@ function why(dayKind: string, state: PushState, rough: boolean): { why: string; 
         decisions: [{ code: 'SUBMAX_DERIVED', params: { sets: 5, reps: Math.round(m * 0.5), bestMax: m } }],
       };
     case 'pushVolume': {
-      const v = pushVariationFor(state);
-      const reps = Math.max(3, Math.ceil(m * PUSH_VOLUME_PCT * v.scale));
+      const n = rough ? PUSH_VOLUME_SETS - 2 : PUSH_VOLUME_SETS;
+      const blocks = pushVolumeBlocks(state, n, m);
+      const blockText = blocks.map((b) => `${b.sets}×${b.reps} ${b.variation.name.toLowerCase()}`).join(', ');
       return {
-        why: `${PUSH_VOLUME_SETS}×${reps} ${v.name.toLowerCase()} push-ups — ${v.flavor}. Same proven dose, new shape.`,
+        why: `${n} sets in ${blocks.length} blocks — ${blockText}. Same proven dose, shifting shapes.`,
         whyDetail:
-          `K Boges sub-max volume, with a rotating variation each session: the dose comes from your max (50 %, scaled for ${v.name.toLowerCase()}), the variety comes from the library. The rep count is the scaffolding — moving well through a new shape is the training.`,
-        decisions: [{ code: 'SUBMAX_DERIVED', params: { sets: PUSH_VOLUME_SETS, reps, bestMax: m } }],
+          'K Boges sub-max volume, split into grip blocks: the dose comes from your max (50 %, scaled per shape), the variety comes from shifting your hands. Simple grips only — the rhythm stays, the stimulus moves around the chest, triceps and shoulders.',
+        decisions: [{ code: 'SUBMAX_DERIVED', params: { sets: n, reps: blocks[0].reps, bestMax: m } }],
       };
     }
     case 'pushMax':
@@ -164,15 +199,20 @@ export function generatePushSession(state: PushState, readiness?: string): Sessi
       break;
     }
     case 'pushVolume': {
-      const variation = pushVariationFor(state);
-      const reps = Math.max(3, Math.ceil(m * PUSH_VOLUME_PCT * variation.scale));
       const n = rough ? PUSH_VOLUME_SETS - 2 : PUSH_VOLUME_SETS;
-      sets = Array.from({ length: n }, (_, i) => ({
-        targetReps: reps,
-        loadKg: 0,
-        restSecAfter: i === n - 1 ? 0 : PUSH_VOLUME_REST,
-        note: i === 0 ? `${variation.name} push-ups — ${variation.flavor}.` : undefined,
-      }));
+      const blocks = pushVolumeBlocks(state, n, m);
+      for (const block of blocks) {
+        for (let i = 0; i < block.sets; i++) {
+          sets.push({
+            targetReps: block.reps,
+            loadKg: 0,
+            restSecAfter: PUSH_VOLUME_REST,
+            variation: { key: block.variation.key, name: block.variation.name, flavor: block.variation.flavor },
+            note: i === 0 ? `${block.variation.name} push-ups — ${block.variation.flavor}.` : undefined,
+          });
+        }
+      }
+      if (sets.length > 0) sets[sets.length - 1].restSecAfter = 0;
       break;
     }
     case 'pushMax': {
@@ -199,6 +239,7 @@ export function generatePushSession(state: PushState, readiness?: string): Sessi
             targetReps: r,
             loadKg: 0,
             ladder: { ladderIndex: l + 1, rung: r },
+            variation: { key: variation.key, name: variation.name, flavor: variation.flavor },
             restSecAfter:
               r === top ? (l === ladders - 1 ? 0 : PUSH_LADDER_REST) : PUSH_LADDER_RUNG_REST,
             note:
@@ -309,6 +350,54 @@ export function replayPushAll(
     lifetimeReps += out.repsDone;
   }
   return { state, prs, lifetimeReps };
+}
+
+// ——— movement library / mastery path ———
+// Purely celebratory: tiers "open" as work accumulates in earlier ones, but
+// nothing in the program generator ever reads this. Reps earned in a tier
+// that hasn't opened yet (ladder days rotate the whole pool) still count.
+export const PUSH_TIERS: Array<{ title: string; keys: string[] }> = [
+  { title: 'Foundation', keys: ['standard', 'wide', 'staggered'] },
+  { title: 'Strength lines', keys: ['diamond', 'decline'] },
+  { title: 'Control', keys: ['tempo', 'pike'] },
+  { title: 'Power', keys: ['explosive', 'archer'] },
+];
+/** cumulative reps across all EARLIER tiers needed for a tier to open */
+export const PUSH_TIER_THRESHOLDS = [0, 300, 800, 1500];
+
+/** lifetime working reps per variation key; legacy sets without a key count as standard */
+export function pushVariationTotals(sessions: LoggedSession[]): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const session of sessions) {
+    for (const set of session.sets) {
+      if (set.isWarmup) continue;
+      const key = set.variationKey ?? 'standard';
+      totals[key] = (totals[key] ?? 0) + set.actualReps;
+    }
+  }
+  return totals;
+}
+
+export interface PushMasteryTier {
+  title: string;
+  open: boolean;
+  items: Array<{ variation: PushVariation; reps: number }>;
+}
+
+export function pushMasteryPath(sessions: LoggedSession[]): PushMasteryTier[] {
+  const totals = pushVariationTotals(sessions);
+  const tierReps = PUSH_TIERS.map((t) => t.keys.reduce((sum, k) => sum + (totals[k] ?? 0), 0));
+  return PUSH_TIERS.map((tier, i) => {
+    const earlier = tierReps.slice(0, i).reduce((sum, r) => sum + r, 0);
+    return {
+      title: tier.title,
+      open: earlier >= PUSH_TIER_THRESHOLDS[i],
+      items: tier.keys.map((k) => ({
+        variation: PUSH_VARIATIONS.find((v) => v.key === k)!,
+        reps: totals[k] ?? 0,
+      })),
+    };
+  });
 }
 
 export const PUSH_MILESTONES = [40, 50, 60, 80, 100];
