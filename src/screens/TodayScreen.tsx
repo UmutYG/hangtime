@@ -5,6 +5,7 @@ import { Readiness } from '../engine/types';
 import { useStore } from '../hooks/useStore';
 import { useWorkout } from '../hooks/useWorkout';
 import { theme, mono, modeIdentity, type } from '../theme';
+import { cycleMilestoneDates, fmtScheduleDate, isTrainingDay } from '../engine/schedule';
 import { ModeMark } from '../components/ModeMark';
 import { WhyCard } from '../components/WhyCard';
 import { WhySheet } from '../components/WhySheet';
@@ -12,6 +13,8 @@ import { ManualLog } from '../components/ManualLog';
 import { ProgressRing } from '../components/ProgressRing';
 import { ModeSwitch } from '../components/ModeSwitch';
 import { ReadinessCard } from '../components/ReadinessCard';
+import { ResumeCard } from '../components/ResumeCard';
+import { workoutMode } from '../engine/activeWorkout';
 import { useReadiness } from '../hooks/useReadiness';
 
 function todayIso(): string {
@@ -71,14 +74,28 @@ export function TodayScreen() {
 
   const e1rmDisplay = store.state.e1rmKg ? Math.round(store.state.e1rmKg * 10) / 10 : null;
   const weekFraction = (store.state.week - 1 + Math.min(store.state.sessionInWeek, 3) / 3) / 4;
-  const deloadInDays = (4 - store.state.week) * 7 || 0;
+  // real dates from the training days picked at onboarding — not session counts
+  const milestones = useMemo(
+    () =>
+      cycleMilestoneDates(
+        profile.trainingDays,
+        todayIso(),
+        store.state.week,
+        store.state.sessionInWeek
+      ),
+    [profile.trainingDays, store.state.week, store.state.sessionInWeek]
+  );
+  const scheduledToday = isTrainingDay(profile.trainingDays, todayIso());
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <ModeSwitch />
       <View style={styles.headerRow}>
         <View>
-          <Text style={styles.dateLabel}>{todayLabel()}</Text>
+          <Text style={styles.dateLabel}>
+            {todayLabel()}
+            {!scheduledToday ? ' · not a training day' : ''}
+          </Text>
           <Text style={type.hero}>Today</Text>
         </View>
         <View style={styles.cycleChip}>
@@ -92,7 +109,16 @@ export function TodayScreen() {
         <Text style={styles.mottoText}>{modeIdentity('pullups').motto}</Text>
       </View>
 
-      <ReadinessCard readiness={readinessInfo} accent={theme.accent} />
+      {workout.pending && workoutMode(workout.pending) === 'pullups' ? (
+        <ResumeCard
+          workout={workout.pending}
+          accent={theme.accent}
+          onResume={workout.resume}
+          onDiscard={workout.discardPending}
+        />
+      ) : null}
+
+      <ReadinessCard readiness={readinessInfo} accent={theme.accent} jointCheck />
 
       {doneToday ? (
         <View style={styles.card}>
@@ -165,8 +191,8 @@ export function TodayScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.ringTitle}>Week {store.state.week} of 4</Text>
           <Text style={styles.ringSub}>
-            {deloadInDays > 0
-              ? `Deload in ~${deloadInDays} days`
+            {milestones.sessionsToDeload > 1 && milestones.deload
+              ? `Deload ${fmtScheduleDate(milestones.deload, todayIso())}`
               : 'Deload week — retest coming up'}
           </Text>
         </View>

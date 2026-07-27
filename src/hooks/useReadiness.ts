@@ -9,6 +9,7 @@ import {
   WeeklyLoad,
 } from '../engine/load';
 import { paceSecPerKm } from '../engine/runs';
+import { JointFeel } from '../engine/types';
 import { useStore } from './useStore';
 
 function todayIso(): string {
@@ -29,12 +30,23 @@ export function useLoadEntries(): LoadEntry[] {
   }, [store.sessions, store.pushSessions, store.runs]);
 }
 
+/** Today's joint check-in, if the user answered it. */
+export function useJointFeel(): JointFeel | null {
+  const { store } = useStore();
+  const today = todayIso();
+  return useMemo(
+    () => store.jointLog?.find((j) => j.date === today)?.feel ?? null,
+    [store.jointLog, today]
+  );
+}
+
 export function useReadiness(modality: Modality): ReadinessResult {
   const { store } = useStore();
   const entries = useLoadEntries();
+  const joints = useJointFeel();
   return useMemo(
-    () => computeReadiness(modality, entries, todayIso(), store.externalReadiness ?? null),
-    [modality, entries, store.externalReadiness]
+    () => computeReadiness(modality, entries, todayIso(), store.externalReadiness ?? null, joints),
+    [modality, entries, store.externalReadiness, joints]
   );
 }
 

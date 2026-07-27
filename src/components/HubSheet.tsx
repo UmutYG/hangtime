@@ -42,7 +42,7 @@ export function HubSheet({ visible, onClose }: { visible: boolean; onClose: () =
       plan = generateSession(store.profile, store.state, today).title;
       done = store.sessions.some((s) => s.date === today && s.dayKind !== 'custom');
     } else if (m.key === 'push') {
-      plan = store.pushState ? generatePushSession(store.pushState).title : 'Not set up yet';
+      plan = store.pushState ? generatePushSession(store.pushState, undefined, today).title : 'Not set up yet';
       done = store.pushSessions.some((s) => s.date === today && s.dayKind !== 'pushCustom');
     } else {
       plan = `${runS.thisWeekKm} km this week`;

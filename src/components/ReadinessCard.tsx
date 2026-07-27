@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { ReadinessResult } from '../engine/load';
 import { theme, mono } from '../theme';
+import { JointCheck } from './JointCheck';
 
 const LEVEL_LABEL: Record<ReadinessResult['level'], string> = {
   fresh: 'Fresh',
@@ -18,7 +19,16 @@ const LEVEL_COLOR: Record<ReadinessResult['level'], string> = {
 };
 
 /** Cross-training awareness, surfaced where you decide what to do today. */
-export function ReadinessCard({ readiness, accent }: { readiness: ReadinessResult; accent: string }) {
+export function ReadinessCard({
+  readiness,
+  accent,
+  jointCheck = false,
+}: {
+  readiness: ReadinessResult;
+  accent: string;
+  /** show the optional elbows/shoulders check-in (upper-body spaces only) */
+  jointCheck?: boolean;
+}) {
   const color = LEVEL_COLOR[readiness.level];
   return (
     <View style={styles.card}>
@@ -45,6 +55,11 @@ export function ReadinessCard({ readiness, accent }: { readiness: ReadinessResul
             : 'Suggested: take it as it comes — tap “Good” to train full.'}
         </Text>
       ) : null}
+      {jointCheck ? (
+        <View style={styles.jointWrap}>
+          <JointCheck accent={accent} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -59,6 +74,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  jointWrap: { borderTopWidth: 1, borderTopColor: theme.cardMuted, paddingTop: 10, marginTop: 2 },
   kicker: { fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: theme.textFaint },
   right: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 8, height: 8, borderRadius: 4 },

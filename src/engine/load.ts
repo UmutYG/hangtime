@@ -18,7 +18,7 @@
 // The output is advisory and always explained. It never silently rewrites your
 // program — it pre-selects the readiness chip you can override in one tap.
 
-import { Effort, ISODate, LoggedSession, Readiness } from './types';
+import { Effort, ISODate, JointFeel, LoggedSession, Readiness } from './types';
 import { Run, paceSecPerKm } from './runs';
 
 export type Modality = 'pull' | 'push' | 'run';
@@ -124,11 +124,16 @@ const MODALITY_NAME: Record<Modality, string> = {
   run: 'Running',
 };
 
+/** Joints are shared by pull and push, so one report shifts both.
+ *  Running loads a different set of joints — it is left alone here. */
+const JOINT_FACTOR: Record<JointFeel, number> = { fine: 1, tender: 0.8, sore: 0.55 };
+
 export function computeReadiness(
   modality: Modality,
   entries: LoadEntry[],
   today: ISODate,
-  external?: ExternalReadiness | null
+  external?: ExternalReadiness | null,
+  jointFeel?: JointFeel | null
 ): ReadinessResult {
   const recent = entries.filter((e) => daysBetween(e.date, today) <= 28 && e.date <= today);
 
@@ -200,6 +205,16 @@ export function computeReadiness(
     );
   } else if (loadRatio !== null && loadRatio <= 0.6 && daysOfData >= 14) {
     reasons.push(`Lighter than usual week (${loadRatio}× normal) — room to push.`);
+  }
+
+  // joint check-in: honest about the tissue that both upper-body spaces share
+  if (jointFeel && jointFeel !== 'fine' && modality !== 'run') {
+    finalScore = Math.round(finalScore * JOINT_FACTOR[jointFeel]);
+    reasons.unshift(
+      jointFeel === 'sore'
+        ? 'You reported sore elbows/shoulders. Joints recover slower than muscle — this is the signal worth respecting.'
+        : 'You reported tender elbows/shoulders. Pull and push share those joints, so both spaces ease off.'
+    );
   }
 
   const level: ReadinessResult['level'] =

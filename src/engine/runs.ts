@@ -7,6 +7,7 @@ export interface Run {
   date: string; // ISO date (YYYY-MM-DD)
   distanceKm: number;
   durationSec: number;
+  /** kept so older logs still parse; nothing populates or displays these now */
   calories?: number;
   avgHrBpm?: number;
   source: 'health' | 'manual';

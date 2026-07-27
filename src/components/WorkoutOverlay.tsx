@@ -1,7 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Effort, LoggedSession, PlannedSet, Profile, SessionPlan } from '../engine/types';
+import { ActiveWorkout } from '../engine/activeWorkout';
+import { clearActiveWorkout, saveActiveWorkout } from '../lib/activeWorkout';
 import { formCueFor } from '../engine/formCues';
 import { theme, mono, type } from '../theme';
 import { ProgressRing } from './ProgressRing';
@@ -38,6 +40,7 @@ export function WorkoutOverlay({
   profile,
   readiness,
   accent = theme.accent,
+  seed,
   onCancel,
   onSave,
 }: {
@@ -45,6 +48,8 @@ export function WorkoutOverlay({
   profile: Profile;
   readiness?: string;
   accent?: string;
+  /** progress from an interrupted session being resumed */
+  seed?: ActiveWorkout | null;
   onCancel: () => void;
   onSave: (session: LoggedSession) => { prCount: number };
 }) {
@@ -60,13 +65,19 @@ export function WorkoutOverlay({
     [modality, plan.cycle, plan.week, plan.sessionInWeek]
   );
 
-  const [warmupDone, setWarmupDone] = useState(!hasWarmup);
-  const [cursor, setCursor] = useState(0); // index into workingIdx
-  const [actuals, setActuals] = useState<Record<number, number>>({});
+  // resuming an interrupted session picks up exactly where it stopped
+  const [warmupDone, setWarmupDone] = useState(seed ? seed.warmupDone : !hasWarmup);
+  const [cursor, setCursor] = useState(() => {
+    if (!seed) return 0;
+    const next = workingIdx.findIndex((i) => seed.actuals[i] === undefined);
+    return next === -1 ? workingIdx.length : next;
+  }); // index into workingIdx
+  const [actuals, setActuals] = useState<Record<number, number>>(seed?.actuals ?? {});
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
   // actual rest tracking: which set this rest follows, when it started, and per-set results
   const [restMeta, setRestMeta] = useState<{ startedAt: number; forIdx: number } | null>(null);
-  const [restsTaken, setRestsTaken] = useState<Record<number, number>>({});
+  const [restsTaken, setRestsTaken] = useState<Record<number, number>>(seed?.restsTaken ?? {});
+  const startedAt = useRef(seed?.startedAt ?? new Date().toISOString());
   const [now, setNow] = useState(Date.now());
   const [effort, setEffort] = useState<Effort>('right');
   const [saved, setSaved] = useState<{ prCount: number } | null>(null);
@@ -106,6 +117,20 @@ export function WorkoutOverlay({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resting, restRemaining === 0]);
+
+  // Snapshot to disk on every step so an interrupted session survives.
+  // Skipped once saved, so a committed session is never resurrected.
+  useEffect(() => {
+    if (saved) return;
+    void saveActiveWorkout({
+      plan,
+      readiness: readiness as ActiveWorkout['readiness'],
+      startedAt: startedAt.current,
+      warmupDone,
+      actuals,
+      restsTaken,
+    });
+  }, [plan, readiness, warmupDone, actuals, restsTaken, saved]);
 
   const finished = warmupDone && cursor >= workingIdx.length;
 
@@ -175,6 +200,7 @@ export function WorkoutOverlay({
     haptic('success');
     const result = onSave(buildSession());
     setSaved(result);
+    void clearActiveWorkout(); // committed to history — the snapshot's job is done
   };
 
   return (

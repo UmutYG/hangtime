@@ -25,6 +25,15 @@ export type DayKind =
 export type Readiness = 'good' | 'ok' | 'rough';
 export type Effort = 'easy' | 'right' | 'grind';
 
+/** How the shared upper-body joints feel today — pull and push both load
+ *  elbows and shoulders, which is why one answer serves both spaces. */
+export type JointFeel = 'fine' | 'tender' | 'sore';
+
+export interface JointReport {
+  date: ISODate;
+  feel: JointFeel;
+}
+
 export interface Equipment {
   /** 'fixed' = a vest/plate of one set weight (progress via reps→sets→density);
    *  'adjustable' = belt with plates (progress via load). */
@@ -186,6 +195,7 @@ export interface PushState {
   week: 1 | 2 | 3 | 4;
   sessionInWeek: 1 | 2 | 3;
   lastSessionDate: ISODate | null;
+  volumeTune: VolumeTune;
 }
 
 export interface TestPoint {
@@ -230,6 +240,8 @@ export interface Store {
   pushLifetimeReps: number;
   /** latest wearable readiness (Oura / Whoop / …) — slot ready, provider later */
   externalReadiness?: import('./load').ExternalReadiness | null;
+  /** optional daily joint check-ins, newest last; feeds pull + push readiness */
+  jointLog?: JointReport[];
   /** last local mutation, ISO datetime — drives cloud-sync conflict resolution */
   updatedAt?: string;
 }

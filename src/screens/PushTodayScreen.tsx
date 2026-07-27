@@ -5,11 +5,14 @@ import { Readiness } from '../engine/types';
 import { useStore } from '../hooks/useStore';
 import { useWorkout } from '../hooks/useWorkout';
 import { theme, mono, modeIdentity, type } from '../theme';
+import { cycleMilestoneDates, fmtScheduleDate } from '../engine/schedule';
 import { ModeSwitch } from '../components/ModeSwitch';
 import { ModeMark } from '../components/ModeMark';
 import { ProgressRing } from '../components/ProgressRing';
 import { Sheet } from '../components/Sheet';
 import { ReadinessCard } from '../components/ReadinessCard';
+import { ResumeCard } from '../components/ResumeCard';
+import { workoutMode } from '../engine/activeWorkout';
 import { useReadiness } from '../hooks/useReadiness';
 
 function todayIso(): string {
@@ -37,7 +40,7 @@ export function PushTodayScreen() {
   const effectiveReadiness = readiness ?? readinessInfo.suggestion;
 
   const plan = useMemo(
-    () => (push ? generatePushSession(push, effectiveReadiness) : null),
+    () => (push ? generatePushSession(push, effectiveReadiness, todayIso()) : null),
     [push, effectiveReadiness]
   );
 
@@ -96,7 +99,12 @@ export function PushTodayScreen() {
     ? `${Math.floor(workingSets[0].restSecAfter / 60)}:${(workingSets[0].restSecAfter % 60).toString().padStart(2, '0')}`
     : '—';
   const weekFraction = (push.week - 1 + Math.min(push.sessionInWeek, 3) / 3) / 4;
-  const deloadInDays = (4 - push.week) * 7 || 0;
+  const milestones = cycleMilestoneDates(
+    store.profile?.trainingDays ?? [],
+    todayIso(),
+    push.week,
+    push.sessionInWeek
+  );
   const goal = computePushGoal(push, todayIso());
 
   return (
@@ -118,7 +126,16 @@ export function PushTodayScreen() {
         <Text style={styles.mottoText}>{modeIdentity('pushups').motto}</Text>
       </View>
 
-      <ReadinessCard readiness={readinessInfo} accent={theme.push} />
+      {workout.pending && workoutMode(workout.pending) === 'pushups' ? (
+        <ResumeCard
+          workout={workout.pending}
+          accent={theme.push}
+          onResume={workout.resume}
+          onDiscard={workout.discardPending}
+        />
+      ) : null}
+
+      <ReadinessCard readiness={readinessInfo} accent={theme.push} jointCheck />
 
       {doneToday ? (
         <View style={styles.card}>
@@ -180,7 +197,9 @@ export function PushTodayScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.ringTitle}>Week {push.week} of 4</Text>
           <Text style={styles.ringSub}>
-            {deloadInDays > 0 ? `Deload in ~${deloadInDays} days` : 'Deload week — retest coming up'}
+            {milestones.sessionsToDeload > 1 && milestones.deload
+              ? `Deload ${fmtScheduleDate(milestones.deload, todayIso())}`
+              : 'Deload week — retest coming up'}
           </Text>
         </View>
       </View>

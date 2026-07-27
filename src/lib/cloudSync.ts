@@ -52,8 +52,11 @@ export async function pullFromCloud(): Promise<Store | null> {
 }
 
 /**
- * Last-write-wins by updatedAt, with one guard: a cloud store that has real
- * training data always beats an empty local store (fresh install restore).
+ * Last-write-wins by updatedAt. Superseded by `mergeStores` in src/engine/merge.ts,
+ * which unions histories instead of replacing them — this destroys the other
+ * device's sessions and is kept only as a reference for the old behaviour.
+ *
+ * @deprecated use mergeStores
  */
 export function pickNewer(local: Store, cloud: Store | null): { winner: Store; from: 'local' | 'cloud' } {
   if (!cloud) return { winner: local, from: 'local' };

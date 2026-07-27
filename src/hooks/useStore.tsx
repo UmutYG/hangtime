@@ -8,11 +8,12 @@ import React, {
 } from 'react';
 import { applyResult, replayAll } from '../engine/stateMachine';
 import { applyPushResult, initialPushState, replayPushAll } from '../engine/pushups';
-import { LoggedSession, Profile, Store } from '../engine/types';
+import { JointFeel, LoggedSession, Profile, Store } from '../engine/types';
 import { mergeRuns, Run } from '../engine/runs';
 import { initialState } from '../engine/generator';
 import { emptyStore, importJson, loadStore, saveStore, stamp } from '../lib/storage';
-import { isCloudAvailable, pickNewer, pullFromCloud, pushToCloud, SyncState } from '../lib/cloudSync';
+import { isCloudAvailable, pullFromCloud, pushToCloud, SyncState } from '../lib/cloudSync';
+import { mergeStores, storeDiffers } from '../engine/merge';
 import { fetchRunsFromHealth, isHealthModuleAvailable, requestHealthAuth } from '../lib/health';
 
 interface StoreApi {
@@ -33,6 +34,7 @@ interface StoreApi {
   /** connect + pull runs from Apple Health; 'unavailable' in Expo Go / web */
   syncHealth: () => Promise<{ added: number } | 'unavailable' | 'denied'>;
   setAppMode: (mode: Store['appMode']) => void;
+  setJointFeel: (feel: JointFeel | null) => void;
   /** first entry into push-ups mode: seed the engine with the user's max */
   setPushMax: (max: number) => void;
   completePushSession: (session: LoggedSession) => { prCount: number };
@@ -67,12 +69,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
       setSyncState('syncing');
       const cloud = await pullFromCloud();
-      const { winner, from } = pickNewer(local, cloud);
-      if (from === 'cloud') {
-        setStore(winner);
-        void saveStore(winner);
-      } else if (winner.profile !== null) {
-        void pushToCloud(winner);
+      if (cloud) {
+        // union-merge rather than last-write-wins: a second device must never
+        // erase this one's history (or have its own erased)
+        const merged = mergeStores(local, cloud);
+        if (storeDiffers(merged, local)) {
+          setStore(merged);
+          void saveStore(merged);
+        }
+        // push whenever the cloud copy is missing anything we just merged in
+        if (merged.profile !== null && storeDiffers(merged, cloud)) void pushToCloud(merged);
+      } else if (local.profile !== null) {
+        void pushToCloud(local);
       }
       setSyncState('synced');
       setLastSyncedAt(new Date().toISOString());
@@ -203,6 +211,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const setPushMax = useCallback(
     (max: number) => {
       update((s) => ({ ...s, pushState: initialPushState(max), pushStartingMax: max }));
+    },
+    [update]
+  );
+
+  /** Optional joint check-in for today — one entry per day, latest answer wins.
+   *  Tapping the current answer again clears it (the question stays optional). */
+  const setJointFeel = useCallback(
+    (feel: JointFeel | null) => {
+      const today = new Date().toISOString().slice(0, 10);
+      update((s) => {
+        const rest = (s.jointLog ?? []).filter((j) => j.date !== today);
+        const log = feel === null ? rest : [...rest, { date: today, feel }];
+        log.sort((a, b) => a.date.localeCompare(b.date));
+        return { ...s, jointLog: log.slice(-120) }; // ~4 months is plenty
+      });
     },
     [update]
   );
@@ -366,12 +389,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
     setSyncState('syncing');
     const cloud = await pullFromCloud();
-    const { winner, from } = pickNewer(store, cloud);
-    if (from === 'cloud') {
-      setStore(winner);
-      void saveStore(winner);
-    } else {
-      await pushToCloud(winner);
+    const merged = cloud ? mergeStores(store, cloud) : store;
+    if (cloud && storeDiffers(merged, store)) {
+      setStore(merged);
+      void saveStore(merged);
+    }
+    if (merged.profile !== null && (!cloud || storeDiffers(merged, cloud))) {
+      await pushToCloud(merged);
     }
     setSyncState('synced');
     setLastSyncedAt(new Date().toISOString());
@@ -396,6 +420,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         deleteRun,
         syncHealth,
         setAppMode,
+        setJointFeel,
         setPushMax,
         completePushSession,
         editPushSession,

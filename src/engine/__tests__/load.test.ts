@@ -180,3 +180,41 @@ describe('unified timeline', () => {
     expect(w.total).toBe(w.pull + w.push + w.run);
   });
 });
+
+describe('joint check-in', () => {
+  const entries: LoadEntry[] = [];
+
+  it('leaves readiness alone when joints are fine or unanswered', () => {
+    const base = computeReadiness('pull', entries, '2026-07-27').score;
+    expect(computeReadiness('pull', entries, '2026-07-27', null, 'fine').score).toBe(base);
+    expect(computeReadiness('pull', entries, '2026-07-27', null, null).score).toBe(base);
+  });
+
+  it('eases both upper-body spaces when joints are tender, and says so', () => {
+    const pull = computeReadiness('pull', entries, '2026-07-27', null, 'tender');
+    const push = computeReadiness('push', entries, '2026-07-27', null, 'tender');
+    expect(pull.score).toBe(80); // 100 × 0.8
+    expect(push.score).toBe(80);
+    expect(pull.reasons[0]).toMatch(/tender/i);
+  });
+
+  it('cuts deeper when sore, enough to change the suggestion', () => {
+    const sore = computeReadiness('pull', entries, '2026-07-27', null, 'sore');
+    expect(sore.score).toBe(55);
+    expect(sore.level).toBe('ready');
+    const loaded: LoadEntry[] = [{ date: '2026-07-26', modality: 'pull', load: 300, label: 'heavy' }];
+    const both = computeReadiness('pull', loaded, '2026-07-27', null, 'sore');
+    expect(both.suggestion).toBeDefined(); // fatigue + sore joints → trims
+  });
+
+  it('does not touch running — different joints entirely', () => {
+    const base = computeReadiness('run', entries, '2026-07-27').score;
+    expect(computeReadiness('run', entries, '2026-07-27', null, 'sore').score).toBe(base);
+  });
+
+  it('still blends a wearable score alongside the joint report', () => {
+    const r = computeReadiness('pull', entries, '2026-07-27', { score: 60, source: 'Oura', date: '2026-07-27' }, 'tender');
+    expect(r.score).toBe(64); // (100 + 60) / 2 = 80, then × 0.8
+    expect(r.reasons.join(' ')).toContain('Oura');
+  });
+});

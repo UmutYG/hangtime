@@ -92,6 +92,7 @@ function WorkoutHost() {
       profile={store.profile}
       readiness={workout.activeReadiness}
       accent={isPush ? theme.push : theme.accent}
+      seed={workout.seed}
       onCancel={workout.end}
       onSave={isPush ? completePushSession : completeSession}
     />

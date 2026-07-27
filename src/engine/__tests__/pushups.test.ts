@@ -9,11 +9,14 @@ import {
   pushVariationFor,
   pushVariationTotals,
   pushVolumeBlocks,
+  defaultPushVolumeTune,
+  nextPushVolumeTune,
   PUSH_SIMPLE_KEYS,
+  PUSH_VOLUME_SETS,
   PUSH_TIER_THRESHOLDS,
   resolvePushDayKind,
 } from '../pushups';
-import { LoggedSession, PR, PushState, SessionPlan } from '../types';
+import { LoggedSession, PR, PushState, SessionPlan, VolumeTune } from '../types';
 
 function logged(plan: SessionPlan, date: string, amrapReps?: number): LoggedSession {
   return {
@@ -270,5 +273,208 @@ describe('push goals', () => {
     expect(goal?.etaMonth).toMatch(/20\d\d/);
     const goal2 = computePushGoal({ ...initialPushState(85), lastTestReps: 85 }, '2026-07-20');
     expect(goal2?.targetValue).toBe(100);
+  });
+});
+
+// ——— volume autoregulation (block-safe fade) ———
+
+function pushVolumeLog(
+  sets: Array<{ target: number; actual: number; rest?: number }>,
+  opts?: { planned?: number; exempt?: boolean; dayKind?: LoggedSession['dayKind'] }
+): LoggedSession {
+  const planned = opts?.planned ?? 60;
+  return {
+    id: 'pv-1',
+    date: '2026-07-27',
+    dayKind: opts?.dayKind ?? 'pushVolume',
+    cycle: 1,
+    week: 1,
+    progressionExempt: opts?.exempt,
+    sets: sets.map((s, i) => ({
+      targetReps: s.target,
+      actualReps: s.actual,
+      loadKg: 0,
+      restSecTaken: s.rest,
+      restSecPlanned: i === sets.length - 1 ? 0 : planned,
+    })),
+  };
+}
+
+/** 10 sets across two blocks with different targets — the shape a real push volume day has */
+const blocked = (early: number, late: number, rest?: number) => [
+  ...Array.from({ length: 5 }, () => ({ target: 15, actual: early, rest })),
+  ...Array.from({ length: 5 }, () => ({ target: 10, actual: late, rest })),
+];
+
+describe('push volume autoregulation', () => {
+  it('measures fade by fulfilment, so a low-rep block is not read as a collapse', () => {
+    // both blocks fully met: 15/15 early, 10/10 late — raw reps drop 33 %, fulfilment is flat
+    const t = nextPushVolumeTune(defaultPushVolumeTune(), pushVolumeLog(blocked(15, 10)));
+    expect(t.lastDropOff).toBeCloseTo(1, 5);
+    expect(t.lastCompletionPct).toBeCloseTo(1, 5);
+    expect(t.lastOutcome).toBe('crisp');
+    expect(t.restSec).toBe(60);
+    expect(t.repAdj).toBe(0);
+  });
+
+  it('catches a real fade inside the blocks', () => {
+    // early block met, late block at 60 % → fulfilment fade 0.6
+    const t = nextPushVolumeTune(defaultPushVolumeTune(), pushVolumeLog(blocked(15, 6)));
+    expect(t.lastDropOff).toBeCloseTo(0.6, 5);
+    expect(t.lastOutcome).toBe('breakdown');
+    expect(t.restSec).toBe(75);
+    expect(t.repAdj).toBe(-1);
+  });
+
+  it('raises rest only on a moderate shortfall', () => {
+    const t = nextPushVolumeTune(defaultPushVolumeTune(), pushVolumeLog(blocked(14, 9)));
+    expect(t.lastOutcome).toBe('moderate');
+    expect(t.restSec).toBe(75);
+    expect(t.repAdj).toBe(0);
+  });
+
+  it('treats stretched rests as moderate even at full completion', () => {
+    const t = nextPushVolumeTune(defaultPushVolumeTune(), pushVolumeLog(blocked(15, 10, 80)));
+    expect(t.lastRestOverage).toBeCloseTo(80 / 60, 5);
+    expect(t.lastOutcome).toBe('moderate');
+    expect(t.restSec).toBe(75);
+  });
+
+  it('walks back to baseline on crisp days, with a one-shot restored', () => {
+    let tune: VolumeTune = { ...defaultPushVolumeTune(), restSec: 90, repAdj: -2 };
+    const crisp = () => pushVolumeLog(blocked(15, 10));
+    const seq: Array<[number, number, string]> = [
+      [75, -2, 'crisp'],
+      [60, -2, 'crisp'],
+      [60, -1, 'crisp'],
+      [60, 0, 'restored'],
+      [60, 0, 'crisp'],
+    ];
+    for (const [rest, adj, outcome] of seq) {
+      tune = nextPushVolumeTune(tune, crisp());
+      expect([tune.restSec, tune.repAdj, tune.lastOutcome]).toEqual([rest, adj, outcome]);
+    }
+  });
+
+  it('pins at rest 90 / repAdj -2 under repeated breakdowns', () => {
+    let tune = defaultPushVolumeTune();
+    for (let i = 0; i < 4; i++) tune = nextPushVolumeTune(tune, pushVolumeLog(blocked(8, 3)));
+    expect(tune.restSec).toBe(90);
+    expect(tune.repAdj).toBe(-2);
+  });
+
+  it('has no rest overage when the log carries no rest data', () => {
+    const t = nextPushVolumeTune(defaultPushVolumeTune(), pushVolumeLog(blocked(15, 10)));
+    expect(t.lastRestOverage).toBeNull();
+  });
+});
+
+describe('push tune wiring', () => {
+  const state = initialPushState(30);
+
+  it('applyPushResult tunes on volume days and skips exempt/deload ones', () => {
+    const faded = pushVolumeLog(blocked(15, 6));
+    expect(applyPushResult(state, faded, []).state.volumeTune.repAdj).toBe(-1);
+
+    const exempt = pushVolumeLog(blocked(15, 6), { exempt: true });
+    expect(applyPushResult(state, exempt, []).state.volumeTune).toEqual(defaultPushVolumeTune());
+
+    const deload = pushVolumeLog(blocked(15, 6), { dayKind: 'pushDeload' });
+    expect(applyPushResult(state, deload, []).state.volumeTune).toEqual(defaultPushVolumeTune());
+  });
+
+  it('a push test resets the tune', () => {
+    const tuned: PushState = {
+      ...state,
+      volumeTune: { ...defaultPushVolumeTune(), restSec: 90, repAdj: -2 },
+    };
+    const test: LoggedSession = {
+      id: 'pt', date: '2026-07-27', dayKind: 'pushTest', cycle: 1, week: 4,
+      sets: [{ targetReps: 32, actualReps: 34, loadKg: 0 }],
+    };
+    expect(applyPushResult(tuned, test, []).state.volumeTune).toEqual(defaultPushVolumeTune());
+  });
+
+  it('does not mutate the previous tune', () => {
+    const before = initialPushState(30);
+    const frozen = JSON.stringify(before.volumeTune);
+    applyPushResult(before, pushVolumeLog(blocked(15, 6)), []);
+    expect(JSON.stringify(before.volumeTune)).toBe(frozen);
+  });
+
+  it('the generator applies repAdj to every block and uses the tuned rest', () => {
+    const tuned: PushState = {
+      ...state,
+      week: 1,
+      sessionInWeek: 2,
+      volumeTune: { ...defaultPushVolumeTune(), restSec: 75, repAdj: -1, lastCompletionPct: 0.84, lastOutcome: 'breakdown' },
+    };
+    const plan = generatePushSession(tuned);
+    expect(plan.dayKind).toBe('pushVolume');
+    const baseline = pushVolumeBlocks(tuned, 10, 30, 0);
+    const adjusted = pushVolumeBlocks(tuned, 10, 30, -1);
+    adjusted.forEach((b, i) => expect(b.reps).toBe(Math.max(3, baseline[i].reps - 1)));
+    const working = plan.sets.filter((s) => !s.isWarmup);
+    expect(working.slice(0, -1).every((s) => s.restSecAfter === 75)).toBe(true);
+    expect(plan.why).toContain('84');
+  });
+
+  it('replaying push sessions reproduces the tune', () => {
+    const sessions = [
+      pushVolumeLog(blocked(15, 6)),
+      { ...pushVolumeLog(blocked(14, 9), { planned: 75 }), id: 'pv-2', date: '2026-07-29' },
+    ];
+    let live = initialPushState(30);
+    for (const s of sessions) live = applyPushResult(live, s, []).state;
+    expect(replayPushAll(30, sessions).state.volumeTune).toEqual(live.volumeTune);
+  });
+});
+
+describe('push layoff ramp', () => {
+  const base = { ...initialPushState(30), lastSessionDate: '2026-07-01' };
+
+  it('trims and exempts a session after 8+ days off, and says why', () => {
+    const plan = generatePushSession({ ...base, sessionInWeek: 2 }, undefined, '2026-07-15');
+    expect(plan.progressionExempt).toBe(true);
+    expect(plan.sets.filter((s) => !s.isWarmup)).toHaveLength(PUSH_VOLUME_SETS - 2);
+    expect(plan.why).toContain('14 days');
+    expect(plan.decisions[0].code).toBe('LAYOFF_RAMP');
+  });
+
+  it('eases rep targets on the ramp-back day', () => {
+    const normal = generatePushSession({ ...base, sessionInWeek: 2 }, undefined, '2026-07-03');
+    const ramp = generatePushSession({ ...base, sessionInWeek: 2 }, undefined, '2026-07-15');
+    const first = (p: SessionPlan) => p.sets.filter((s) => !s.isWarmup)[0].targetReps;
+    expect(first(ramp)).toBeLessThan(first(normal));
+  });
+
+  it('leaves a normal gap completely alone', () => {
+    const plan = generatePushSession({ ...base, sessionInWeek: 2 }, undefined, '2026-07-03');
+    expect(plan.progressionExempt).toBe(false);
+    expect(plan.sets.filter((s) => !s.isWarmup)).toHaveLength(PUSH_VOLUME_SETS);
+    expect(plan.why).not.toContain('days since');
+  });
+
+  it('does nothing without a today date or a previous session', () => {
+    expect(generatePushSession({ ...base, sessionInWeek: 2 }).progressionExempt).toBe(false);
+    const fresh = { ...initialPushState(30), sessionInWeek: 2 as const };
+    expect(generatePushSession(fresh, undefined, '2026-12-01').progressionExempt).toBe(false);
+  });
+
+  it('a ramp-back session cannot move the tune or the max', () => {
+    const tuned: PushState = {
+      ...base,
+      volumeTune: { ...defaultPushVolumeTune(), restSec: 75, repAdj: -1 },
+    };
+    const plan = generatePushSession({ ...tuned, sessionInWeek: 2 }, undefined, '2026-07-15');
+    const log: LoggedSession = {
+      id: 'ramp', date: '2026-07-15', dayKind: plan.dayKind, cycle: 1, week: 1,
+      progressionExempt: plan.progressionExempt,
+      sets: plan.sets.map((s) => ({ targetReps: s.targetReps, actualReps: 2, loadKg: 0, isWarmup: s.isWarmup })),
+    };
+    const out = applyPushResult(tuned, log, []);
+    expect(out.state.volumeTune.restSec).toBe(75);
+    expect(out.state.volumeTune.repAdj).toBe(-1);
+    expect(out.state.bestMaxSet).toBe(30);
   });
 });

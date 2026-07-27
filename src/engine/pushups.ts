@@ -11,7 +11,17 @@
 //
 // Every session self-tunes from your latest all-out set. No AI, no guesses.
 
-import { Decision, ISODate, LoggedSession, PlannedSet, PR, PushState, SessionPlan } from './types';
+import {
+  Decision,
+  ISODate,
+  LoggedSession,
+  PlannedSet,
+  PR,
+  PushState,
+  SessionPlan,
+  SetLog,
+  VolumeTune,
+} from './types';
 
 export const PUSH_VOLUME_SETS = 10;
 export const PUSH_VOLUME_PCT = 0.5;
@@ -72,8 +82,14 @@ export interface PushVolumeBlock {
   reps: number;
 }
 
-/** Split a volume day into 2–3 contiguous grip blocks, deterministically. */
-export function pushVolumeBlocks(state: PushState, totalSets: number, bestMax: number): PushVolumeBlock[] {
+/** Split a volume day into 2–3 contiguous grip blocks, deterministically.
+ *  `repAdj` is the autoregulation offset (0, −1, −2) applied to every block. */
+export function pushVolumeBlocks(
+  state: PushState,
+  totalSets: number,
+  bestMax: number,
+  repAdj = 0
+): PushVolumeBlock[] {
   const simplePool = PUSH_SIMPLE_KEYS.map((k) => PUSH_VARIATIONS.find((v) => v.key === k)!);
   const seed = state.cycle * 5 + state.week * 3 + state.sessionInWeek;
   const blockCount = 2 + (seed % 2);
@@ -88,7 +104,7 @@ export function pushVolumeBlocks(state: PushState, totalSets: number, bestMax: n
     return {
       variation,
       sets: base + (b < remainder ? 1 : 0),
-      reps: Math.max(3, Math.ceil(bestMax * PUSH_VOLUME_PCT * variation.scale)),
+      reps: Math.max(3, Math.ceil(bestMax * PUSH_VOLUME_PCT * variation.scale) + repAdj),
     };
   });
 }
@@ -101,6 +117,114 @@ export function initialPushState(startingMax: number): PushState {
     week: 1,
     sessionInWeek: 1,
     lastSessionDate: null,
+    volumeTune: defaultPushVolumeTune(),
+  };
+}
+
+// ——— volume-day autoregulation ———
+// Same rest-first policy as the pull-up engine, with one necessary difference:
+// push volume days are grip BLOCKS with different rep targets per block, so raw
+// rep drop-off across blocks would compare a 14-rep diamond set to a 20-rep
+// standard set. We compare fulfilment (actual ÷ target) instead — same
+// physiology, block-safe.
+/** a gap this long means ramping back in, not picking up where you left off */
+export const PUSH_LAYOFF_DAYS = 8;
+export const PUSH_LAYOFF_REP_FACTOR = 0.9;
+
+function pushDaysBetween(a: ISODate, b: ISODate): number {
+  return Math.floor((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000);
+}
+
+export const PUSH_VOLUME_REST_STEPS = [60, 75, 90] as const;
+export const PUSH_REP_ADJ_FLOOR = -2;
+export const PUSH_CRISP_COMPLETION = 0.95;
+export const PUSH_CRISP_FADE = 0.8; // late-set fulfilment vs early, ≥ = fine
+export const PUSH_CRISP_REST_OVERAGE = 1.15;
+export const PUSH_SHORTFALL_COMPLETION = 0.85;
+export const PUSH_BREAKDOWN_FADE = 0.7; // 30 %+ fulfilment fade = breakdown
+
+export function defaultPushVolumeTune(): VolumeTune {
+  return {
+    repAdj: 0,
+    restSec: PUSH_VOLUME_REST,
+    lastCompletionPct: null,
+    lastDropOff: null,
+    lastRestOverage: null,
+    lastOutcome: null,
+  };
+}
+
+/** Mean fulfilment (actual ÷ target) over a slice of sets. */
+function meanFulfilment(sets: SetLog[]): number | null {
+  const usable = sets.filter((s) => s.targetReps > 0);
+  if (usable.length === 0) return null;
+  return usable.reduce((a, s) => a + s.actualReps / s.targetReps, 0) / usable.length;
+}
+
+/**
+ * Read a completed push volume session and return the next session's tune.
+ * Block-safe: fade compares the last third of sets to the first third by
+ * fulfilment, never by raw reps.
+ */
+export function nextPushVolumeTune(prev: VolumeTune, session: LoggedSession): VolumeTune {
+  const working = session.sets.filter((s) => !s.isWarmup);
+  if (working.length === 0) return prev;
+
+  const totalTarget = working.reduce((a, s) => a + s.targetReps, 0);
+  const totalActual = working.reduce((a, s) => a + s.actualReps, 0);
+  const completion = totalTarget > 0 ? totalActual / totalTarget : 1;
+
+  const third = Math.max(1, Math.floor(working.length / 3));
+  const early = meanFulfilment(working.slice(0, third));
+  const late = meanFulfilment(working.slice(-third));
+  const fade = early !== null && late !== null && early > 0 ? late / early : null;
+
+  const pairs = working.filter(
+    (s) => s.restSecTaken !== undefined && (s.restSecPlanned ?? 0) > 0
+  );
+  const restOverage =
+    pairs.length > 0
+      ? pairs.reduce((a, s) => a + s.restSecTaken! / s.restSecPlanned!, 0) / pairs.length
+      : null;
+
+  const stepUp = (r: number) =>
+    r === PUSH_VOLUME_REST_STEPS[0] ? PUSH_VOLUME_REST_STEPS[1] : PUSH_VOLUME_REST_STEPS[2];
+  const stepDown = (r: number) =>
+    r === PUSH_VOLUME_REST_STEPS[2] ? PUSH_VOLUME_REST_STEPS[1] : PUSH_VOLUME_REST_STEPS[0];
+
+  const breakdown =
+    completion < PUSH_SHORTFALL_COMPLETION || (fade !== null && fade < PUSH_BREAKDOWN_FADE);
+  const crisp =
+    !breakdown &&
+    completion >= PUSH_CRISP_COMPLETION &&
+    (fade === null || fade >= PUSH_CRISP_FADE) &&
+    (restOverage === null || restOverage <= PUSH_CRISP_REST_OVERAGE);
+
+  let repAdj = prev.repAdj;
+  let restSec = prev.restSec;
+  let outcome: VolumeTune['lastOutcome'];
+  if (breakdown) {
+    restSec = stepUp(restSec);
+    repAdj = Math.max(PUSH_REP_ADJ_FLOOR, repAdj - 1);
+    outcome = 'breakdown';
+  } else if (crisp) {
+    if (restSec > PUSH_VOLUME_REST) restSec = stepDown(restSec);
+    else if (repAdj < 0) repAdj += 1;
+    const wasTuned = prev.restSec !== PUSH_VOLUME_REST || prev.repAdj !== 0;
+    const nowBaseline = restSec === PUSH_VOLUME_REST && repAdj === 0;
+    outcome = wasTuned && nowBaseline ? 'restored' : 'crisp';
+  } else {
+    restSec = stepUp(restSec);
+    outcome = 'moderate';
+  }
+
+  return {
+    repAdj,
+    restSec,
+    lastCompletionPct: completion,
+    lastDropOff: fade,
+    lastRestOverage: restOverage,
+    lastOutcome: outcome,
   };
 }
 
@@ -122,8 +246,22 @@ const TITLES: Record<string, string> = {
   pushTest: 'TEST — max push-ups',
 };
 
-function why(dayKind: string, state: PushState, rough: boolean): { why: string; whyDetail: string; decisions: Decision[] } {
+function why(
+  dayKind: string,
+  state: PushState,
+  rough: boolean,
+  layoffDays = 0
+): { why: string; whyDetail: string; decisions: Decision[] } {
   const m = state.bestMaxSet;
+  if (layoffDays > 0) {
+    // the ramp-back message replaces the day's usual reasoning
+    return {
+      why: `${layoffDays} days since your last push-up session — today is trimmed and eased to ramp back in. It won't count against your progression.`,
+      whyDetail:
+        'Strength-endurance fades faster than strength after a break, and the first session back is where form breaks down and elbows complain. So the day is shorter, the targets are lower, and nothing you do today can lower your max or tighten your program. Do it, feel the pattern again, and the full prescription comes back next session.',
+      decisions: [{ code: 'LAYOFF_RAMP', params: { days: layoffDays } }],
+    };
+  }
   switch (dayKind) {
     case 'pushPyramid':
       return {
@@ -134,12 +272,28 @@ function why(dayKind: string, state: PushState, rough: boolean): { why: string; 
       };
     case 'pushVolume': {
       const n = rough ? PUSH_VOLUME_SETS - 2 : PUSH_VOLUME_SETS;
-      const blocks = pushVolumeBlocks(state, n, m);
+      const tune = state.volumeTune;
+      const blocks = pushVolumeBlocks(state, n, m, tune.repAdj);
       const blockText = blocks.map((b) => `${b.sets}×${b.reps} ${b.variation.name.toLowerCase()}`).join(', ');
+      const base = `${n} sets in ${blocks.length} blocks — ${blockText}.`;
+      const tuned = tune.repAdj !== 0 || tune.restSec !== PUSH_VOLUME_REST;
+      const pct = Math.round((tune.lastCompletionPct ?? 1) * 100);
+
+      let why = `${base} Same proven dose, shifting shapes.`;
+      if (tuned && tune.lastOutcome === 'crisp') {
+        why = `${base} Last one was crisp, so today steps back toward the full day — ${tune.restSec} s rests. Keep it clean and the baseline returns.`;
+      } else if (tuned) {
+        why = `${base} You finished ${pct} % of target last time${
+          tune.repAdj < 0 ? ', so reps ease off' : ''
+        } and rests grow to ${tune.restSec} s. Finish it crisp and the numbers climb back.`;
+      } else if (tune.lastOutcome === 'restored') {
+        why = `${base} Back to baseline at ${tune.restSec} s rests — you earned the full day back.`;
+      }
+
       return {
-        why: `${n} sets in ${blocks.length} blocks — ${blockText}. Same proven dose, shifting shapes.`,
+        why,
         whyDetail:
-          'K Boges sub-max volume, split into grip blocks: the dose comes from your max (50 %, scaled per shape), the variety comes from shifting your hands. Simple grips only — the rhythm stays, the stimulus moves around the chest, triceps and shoulders.',
+          'K Boges sub-max volume, split into grip blocks: the dose comes from your max (50 %, scaled per shape), the variety comes from shifting your hands. The program also reads how the last volume day actually went — how much of the target you finished, whether the late sets faded against the early ones, and how your rests compared to plan. It adds rest before it takes away reps, and a crisp day walks everything back toward baseline. Volume day never gets harder than baseline; that is what max day is for.',
         decisions: [{ code: 'SUBMAX_DERIVED', params: { sets: n, reps: blocks[0].reps, bestMax: m } }],
       };
     }
@@ -174,10 +328,22 @@ function why(dayKind: string, state: PushState, rough: boolean): { why: string; 
   }
 }
 
-export function generatePushSession(state: PushState, readiness?: string): SessionPlan {
+export function generatePushSession(
+  state: PushState,
+  readiness?: string,
+  today?: ISODate
+): SessionPlan {
   const dayKind = resolvePushDayKind(state);
-  const m = Math.max(5, state.bestMaxSet);
   const rough = readiness === 'rough';
+
+  // Coming back from a break: ramp in on a trimmed day that can't count against
+  // you. Mirrors the pull-up engine's layoff handling (same 8-day threshold).
+  const layoffDays =
+    today && state.lastSessionDate ? pushDaysBetween(state.lastSessionDate, today) : 0;
+  const layoff = layoffDays >= PUSH_LAYOFF_DAYS;
+  const trim = rough || layoff;
+  // no load to shave on push-ups, so the ramp eases the rep targets instead
+  const m = Math.max(5, Math.round(state.bestMaxSet * (layoff ? PUSH_LAYOFF_REP_FACTOR : 1)));
   let sets: PlannedSet[] = [];
 
   switch (dayKind) {
@@ -195,18 +361,18 @@ export function generatePushSession(state: PushState, readiness?: string): Sessi
         restSecAfter: 0,
         note: 'Last set: as many clean reps as you have — this recalibrates your targets.',
       });
-      if (rough) sets = sets.slice(1);
+      if (trim) sets = sets.slice(1);
       break;
     }
     case 'pushVolume': {
-      const n = rough ? PUSH_VOLUME_SETS - 2 : PUSH_VOLUME_SETS;
-      const blocks = pushVolumeBlocks(state, n, m);
+      const n = trim ? PUSH_VOLUME_SETS - 2 : PUSH_VOLUME_SETS;
+      const blocks = pushVolumeBlocks(state, n, m, state.volumeTune.repAdj);
       for (const block of blocks) {
         for (let i = 0; i < block.sets; i++) {
           sets.push({
             targetReps: block.reps,
             loadKg: 0,
-            restSecAfter: PUSH_VOLUME_REST,
+            restSecAfter: state.volumeTune.restSec,
             variation: { key: block.variation.key, name: block.variation.name, flavor: block.variation.flavor },
             note: i === 0 ? `${block.variation.name} push-ups — ${block.variation.flavor}.` : undefined,
           });
@@ -229,7 +395,7 @@ export function generatePushSession(state: PushState, readiness?: string): Sessi
       break;
     }
     case 'pushLadder': {
-      const ladders = rough ? PUSH_LADDER_COUNT - 1 : PUSH_LADDER_COUNT;
+      const ladders = trim ? PUSH_LADDER_COUNT - 1 : PUSH_LADDER_COUNT;
       for (let l = 0; l < ladders; l++) {
         // every ladder gets its own variation — the play day
         const variation = pushVariationFor(state, l);
@@ -273,7 +439,7 @@ export function generatePushSession(state: PushState, readiness?: string): Sessi
     }
   }
 
-  const w = why(dayKind, state, rough);
+  const w = why(dayKind, state, trim, layoff ? layoffDays : 0);
   return {
     dayKind,
     cycle: state.cycle,
@@ -284,7 +450,7 @@ export function generatePushSession(state: PushState, readiness?: string): Sessi
     decisions: w.decisions,
     why: w.why,
     whyDetail: w.whyDetail,
-    progressionExempt: rough,
+    progressionExempt: rough || layoff,
   };
 }
 
@@ -306,7 +472,11 @@ export function applyPushResult(
   session: LoggedSession,
   existingPrs: PR[]
 ): { state: PushState; newPrs: PR[]; repsDone: number } {
-  let state: PushState = { ...prevState, lastSessionDate: session.date };
+  let state: PushState = {
+    ...prevState,
+    volumeTune: { ...prevState.volumeTune },
+    lastSessionDate: session.date,
+  };
   const newPrs: PR[] = [];
   const repsDone = session.sets.reduce((sum, s) => sum + s.actualReps, 0);
   const best = Math.max(0, ...session.sets.filter((s) => !s.isWarmup).map((s) => s.actualReps));
@@ -325,9 +495,15 @@ export function applyPushResult(
     if (session.dayKind === 'pushTest' && best > 0) {
       state.bestMaxSet = best;
       state.lastTestReps = best;
+      // a fresh max redefines the volume baseline — old rep/rest debt is stale
+      state.volumeTune = defaultPushVolumeTune();
     }
     if (best > prMax && best > 0 && ['pushMax', 'pushPyramid', 'pushTest'].includes(session.dayKind)) {
       newPrs.push({ kind: 'pushMax', value: best, date: session.date });
+    }
+    // volume days autoregulate; deload days are never judged
+    if (session.dayKind === 'pushVolume') {
+      state.volumeTune = nextPushVolumeTune(prevState.volumeTune, session);
     }
   }
 

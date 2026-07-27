@@ -28,18 +28,21 @@ export function isHealthModuleAvailable(): boolean {
 }
 
 
-/** Ask the user for read access (iOS shows the Health permission sheet once). */
+/**
+ * Ask the user for read access (iOS shows the Health permission sheet once).
+ *
+ * Deliberately the minimum: workouts and running distance, nothing else.
+ * Heart rate and active energy used to be requested here and were never shown
+ * anywhere — asking for health data you don't use is exactly the kind of quiet
+ * overreach this app shouldn't do. Add an identifier back only when something
+ * actually displays it.
+ */
 export async function requestHealthAuth(): Promise<boolean> {
   if (!isHealthModuleAvailable()) return false;
   try {
     return (
       (await HK.requestAuthorization({
-        toRead: [
-          'HKWorkoutTypeIdentifier',
-          'HKQuantityTypeIdentifierDistanceWalkingRunning',
-          'HKQuantityTypeIdentifierHeartRate',
-          'HKQuantityTypeIdentifierActiveEnergyBurned',
-        ],
+        toRead: ['HKWorkoutTypeIdentifier', 'HKQuantityTypeIdentifierDistanceWalkingRunning'],
       })) === true
     );
   } catch {
@@ -80,13 +83,12 @@ export async function fetchRunsFromHealth(): Promise<Run[]> {
           : Math.round((end.getTime() - start.getTime()) / 1000);
       const distanceKm = quantityToKm(w.totalDistance);
       if (durationSec < 120 || distanceKm < 0.3) continue; // ignore noise
-      const calories = w.totalEnergyBurned?.quantity;
+      // distance + duration only — we no longer read energy, so we no longer ask for it
       runs.push({
         id: String(w.uuid ?? `${start.toISOString()}-${distanceKm}`),
         date: start.toISOString().slice(0, 10),
         distanceKm,
         durationSec,
-        calories: Number.isFinite(calories) ? Math.round(Number(calories)) : undefined,
         source: 'health',
       });
     }
