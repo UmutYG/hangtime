@@ -52,6 +52,14 @@ export function explainShort(d: Decision): string {
       return `${p.days} days off → today is slightly reduced to ramp back in. It won't count against your progression.`;
     case 'POST_DELOAD_RESUME':
       return `Back from deload at −5 % load — a running start. You'll be past your old numbers within two weeks.`;
+    case 'VOLUME_ADAPTED':
+      return p.direction === 'rebuilding'
+        ? `Last volume day was crisp, so today steps back toward the full day: ${p.sets}×${p.reps} with ${p.restSec} s rests. Keep it clean and the baseline returns.`
+        : `Last volume day you finished ${p.completionPct} % of target${
+            Number(p.repAdj) < 0 ? `, so reps ease to ${p.reps}` : ''
+          } and rests grow to ${p.restSec} s today. Finish it crisp and the numbers climb back.`;
+    case 'VOLUME_RESTORED':
+      return `Back to baseline: ${p.sets}×${p.reps} @ ${p.restSec} s. You earned the full day back — that's the adaptive loop doing its job.`;
     default:
       return '';
   }
@@ -87,6 +95,10 @@ export function explainDetail(d: Decision): string {
     case 'TEST_BW':
     case 'TEST_WEIGHTED':
       return `Tests happen only after easy days because fatigue hides fitness. The result updates your goal ETA and re-derives every target in the program — this is how the plan stays honest.`;
+    case 'VOLUME_ADAPTED':
+      return `The program reads three things from your last volume day: how much of the target you completed, how far the last set fell from the first, and how your rests compared to plan. It adjusts rest first — research shows short rests are what make reps fade set to set — and only trims a rep when sets genuinely broke down (a 30 %+ drop is failure territory a sub-max day must avoid). Crisp days walk everything back toward the 10-set baseline; volume day never gets harder than baseline, because progress lives on max day.`;
+    case 'VOLUME_RESTORED':
+      return `A dip in a volume day is information, not failure. The program eased the day, you finished it crisp, and now the full prescription is back — autoregulation doing exactly what it should.`;
     default:
       return '';
   }

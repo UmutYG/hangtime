@@ -50,14 +50,16 @@ export function baseRpe(dayKind: string): number {
 
 const EFFORT_ADJ: Record<Effort, number> = { easy: -1, right: 0, grind: 1 };
 
-/** Estimated wall-clock minutes: ~3 s per rep plus the prescribed rests. */
+/** Estimated wall-clock minutes: ~3 s per rep plus rests — measured rests when
+ *  the log has them (newer sessions), estimated by day type for the gaps that don't. */
 export function sessionDurationMin(session: LoggedSession): number {
   const reps = session.sets.reduce((sum, s) => sum + s.actualReps, 0);
   const workSec = reps * 3;
-  // rests aren't stored on the log, so approximate from set count and day type
+  const measured = session.sets.filter((s) => s.restSecTaken !== undefined);
+  const measuredSec = measured.reduce((sum, s) => sum + (s.restSecTaken ?? 0), 0);
   const restPerSet = baseRpe(session.dayKind) >= 8 ? 150 : 60;
-  const restSec = Math.max(0, session.sets.length - 1) * restPerSet;
-  return Math.max(4, Math.round((workSec + restSec) / 60));
+  const missingGaps = Math.max(0, session.sets.length - 1 - measured.length);
+  return Math.max(4, Math.round((workSec + measuredSec + missingGaps * restPerSet) / 60));
 }
 
 export function sessionLoad(session: LoggedSession): number {

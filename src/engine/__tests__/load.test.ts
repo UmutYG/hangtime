@@ -59,6 +59,24 @@ describe('session load (Foster session-RPE)', () => {
   });
 });
 
+describe('session duration with measured rests', () => {
+  it('uses recorded restSecTaken and estimates only unmeasured gaps', () => {
+    const s = session('2026-07-24', 'volume', 10, 10);
+    const legacy = sessionLoad(s);
+    const withRests: LoggedSession = {
+      ...s,
+      sets: s.sets.map((x, i) => (i < 9 ? { ...x, restSecTaken: 90, restSecPlanned: 60 } : x)),
+    };
+    // 9 measured 90s rests (810s) vs 9 estimated 60s (540s) → more load
+    expect(sessionLoad(withRests)).toBeGreaterThan(legacy);
+  });
+
+  it('legacy sessions reproduce the old estimate exactly', () => {
+    const s = session('2026-07-24', 'volume', 10, 10);
+    expect(sessionLoad(s)).toBe(sessionLoad({ ...s }));
+  });
+});
+
 describe('cross-modal overlap is asymmetric and honest', () => {
   it('pull and push interfere less with each other than with themselves', () => {
     expect(OVERLAP.pull.push).toBeLessThan(OVERLAP.pull.pull);

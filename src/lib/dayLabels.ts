@@ -1,0 +1,41 @@
+// Shared day-kind display names — used by History and the session detail sheet.
+
+export const DAY_LABEL: Record<string, string> = {
+  calibration: 'CALIBRATION',
+  heavy: 'WEIGHTED',
+  volume: 'BODYWEIGHT · VOLUME',
+  max: 'BODYWEIGHT · MAX',
+  ladder: 'BODYWEIGHT · DENSITY',
+  deloadHeavy: 'DELOAD',
+  deloadVolume: 'DELOAD',
+  testBw: 'TEST · PR',
+  testWeighted: 'TEST · PR',
+  custom: 'MANUAL',
+  pushPyramid: 'PYRAMID',
+  pushVolume: 'VOLUME',
+  pushMax: 'MAX',
+  pushLadder: 'LADDERS',
+  pushDeload: 'DELOAD',
+  pushTest: 'TEST · PR',
+  pushCustom: 'MANUAL',
+};
+
+export const DAY_TITLE: Record<string, string> = {
+  calibration: 'Calibration',
+  heavy: 'Weighted pull-ups',
+  volume: 'K Boges volume',
+  max: 'Max-effort sets',
+  ladder: 'Ladders',
+  deloadHeavy: 'Deload',
+  deloadVolume: 'Deload volume',
+  testBw: 'BW max test',
+  testWeighted: 'Vest max test',
+  custom: 'Logged workout',
+  pushPyramid: 'Pyramid push-ups',
+  pushVolume: 'Volume push-ups',
+  pushMax: 'Max-effort push-ups',
+  pushLadder: 'Push-up ladders',
+  pushDeload: 'Deload push-ups',
+  pushTest: 'Push-up max test',
+  pushCustom: 'Logged push-ups',
+};

@@ -74,7 +74,9 @@ export type ReasonCode =
   | 'TEST_WEIGHTED'
   | 'READINESS_TRIM'
   | 'LAYOFF_RAMP'
-  | 'POST_DELOAD_RESUME';
+  | 'POST_DELOAD_RESUME'
+  | 'VOLUME_ADAPTED'
+  | 'VOLUME_RESTORED';
 
 export interface Decision {
   code: ReasonCode;
@@ -101,6 +103,11 @@ export interface SetLog {
   isWarmup?: boolean;
   /** push-up variation key; absent on legacy logs and standard sets → counts as 'standard' */
   variationKey?: string;
+  /** actual rest taken AFTER this set, seconds — measured from rest-timer start to
+   *  dismissal (skip) or expiry incl. +30s extensions; absent on legacy logs, warmups, last sets */
+  restSecTaken?: number;
+  /** planned rest after this set, copied from the plan so history can show taken-vs-plan */
+  restSecPlanned?: number;
 }
 
 export interface LoggedSession {
@@ -131,6 +138,25 @@ export interface WeightedState {
   suggestMoreLoad: boolean;
 }
 
+export type VolumeOutcome = 'crisp' | 'moderate' | 'breakdown' | 'restored';
+
+/** Volume-day autoregulation — rest-first, never harder than baseline.
+ *  Grounded in velocity-loss research (≤20% drop = quality zone, ≥30% = failure
+ *  territory) and rest-interval studies (short rests are what make reps fade). */
+export interface VolumeTune {
+  /** added to the baseline rep target; 0, -1 or -2 */
+  repAdj: number;
+  /** prescribed rest between volume sets; 60 | 75 | 90 */
+  restSec: number;
+  /** metrics from the last counted (non-exempt) volume session — for display & why */
+  lastCompletionPct: number | null; // Σactual/Σtarget
+  lastDropOff: number | null; // last set actual / first set actual
+  lastRestOverage: number | null; // mean(taken/planned); null when no rest data
+  /** classification of the last counted volume day; 'restored' = a crisp day
+   *  just returned the tune to baseline (one-shot note) */
+  lastOutcome: VolumeOutcome | null;
+}
+
 export interface ProgramState {
   calibrated: boolean;
   cycle: number; // 1-based
@@ -143,6 +169,7 @@ export interface ProgramState {
   e1rmKg: number | null; // system-weight estimated 1RM
   pendingDeload: boolean;
   lastSessionDate: ISODate | null;
+  volumeTune: VolumeTune;
 }
 
 export interface PR {

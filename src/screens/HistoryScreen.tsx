@@ -7,45 +7,9 @@ import { theme, mono, type } from '../theme';
 import { ManualLog } from '../components/ManualLog';
 import { RunLog } from '../components/RunLog';
 import { ModeSwitch } from '../components/ModeSwitch';
+import { SessionDetail } from '../components/SessionDetail';
+import { DAY_LABEL, DAY_TITLE } from '../lib/dayLabels';
 
-const DAY_LABEL: Record<string, string> = {
-  calibration: 'CALIBRATION',
-  heavy: 'WEIGHTED',
-  volume: 'BODYWEIGHT · VOLUME',
-  max: 'BODYWEIGHT · MAX',
-  ladder: 'BODYWEIGHT · DENSITY',
-  deloadHeavy: 'DELOAD',
-  deloadVolume: 'DELOAD',
-  testBw: 'TEST · PR',
-  testWeighted: 'TEST · PR',
-  custom: 'MANUAL',
-  pushPyramid: 'PYRAMID',
-  pushVolume: 'VOLUME',
-  pushMax: 'MAX',
-  pushLadder: 'LADDERS',
-  pushDeload: 'DELOAD',
-  pushTest: 'TEST · PR',
-  pushCustom: 'MANUAL',
-};
-const DAY_TITLE: Record<string, string> = {
-  calibration: 'Calibration',
-  heavy: 'Weighted pull-ups',
-  volume: 'K Boges volume',
-  max: 'Max-effort sets',
-  ladder: 'Ladders',
-  deloadHeavy: 'Deload',
-  deloadVolume: 'Deload volume',
-  testBw: 'BW max test',
-  testWeighted: 'Vest max test',
-  custom: 'Logged workout',
-  pushPyramid: 'Pyramid push-ups',
-  pushVolume: 'Volume push-ups',
-  pushMax: 'Max-effort push-ups',
-  pushLadder: 'Push-up ladders',
-  pushDeload: 'Deload push-ups',
-  pushTest: 'Push-up max test',
-  pushCustom: 'Logged push-ups',
-};
 const KIND_COLOR: Record<string, string> = {
   heavy: theme.accent,
   testBw: theme.good,
@@ -94,6 +58,7 @@ export function HistoryScreen() {
     restorePushSession,
     emptyPushTrash,
   } = useStore();
+  const [viewing, setViewing] = useState<LoggedSession | null>(null);
   const [editing, setEditing] = useState<LoggedSession | null>(null);
   const [editingRun, setEditingRun] = useState<Run | null>(null);
   const [logOpen, setLogOpen] = useState(false);
@@ -188,7 +153,7 @@ export function HistoryScreen() {
             const s = item.session;
             const reps = s.sets.reduce((sum, x) => sum + x.actualReps, 0);
             return (
-              <Pressable key={s.id} onPress={() => setEditing(s)} style={styles.row}>
+              <Pressable key={s.id} onPress={() => setViewing(s)} style={styles.row}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.kind, { color: KIND_COLOR[s.dayKind] ?? theme.textDim }]}>
                     {DAY_LABEL[s.dayKind] ?? s.dayKind.toUpperCase()}
@@ -206,7 +171,7 @@ export function HistoryScreen() {
                   <Pressable
                     onPress={(e) => {
                       e.stopPropagation();
-                      deleteSession(s.id);
+                      doDeleteSession(s.id);
                     }}
                     hitSlop={10}
                     style={styles.deleteBtn}
@@ -258,6 +223,19 @@ export function HistoryScreen() {
       </>
       ) : null}
 
+      <SessionDetail
+        session={viewing}
+        accent={isPush ? theme.push : theme.accent}
+        onClose={() => setViewing(null)}
+        onEdit={(s) => {
+          setViewing(null);
+          setEditing(s);
+        }}
+        onDelete={(id) => {
+          setViewing(null);
+          doDeleteSession(id);
+        }}
+      />
       <ManualLog
         visible={logOpen}
         defaultLoadKg={isPush ? 0 : profile.equipment.fixedLoadKg}

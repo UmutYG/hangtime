@@ -38,6 +38,7 @@ export function initialState(profile: Profile): ProgramState {
     e1rmKg: fixed ? e1rmSystem(profile.bodyweightKg, 0, profile.startingMax) : null,
     pendingDeload: false,
     lastSessionDate: null,
+    volumeTune: C.defaultVolumeTune(),
   };
 }
 
@@ -215,8 +216,31 @@ export function generateSession(
       break;
     }
     case 'volume': {
-      const reps = Math.max(3, Math.ceil(state.bwBestMaxSet * C.VOLUME_PCT_OF_MAX));
+      const tune = state.volumeTune;
+      const baseReps = Math.max(3, Math.ceil(state.bwBestMaxSet * C.VOLUME_PCT_OF_MAX));
+      const reps = Math.max(3, baseReps + tune.repAdj);
+      const restSec = tune.restSec;
       const n = rough ? C.VOLUME_SETS_ROUGH : C.VOLUME_SETS;
+
+      const tuned = tune.repAdj !== 0 || tune.restSec !== C.VOLUME_REST_SEC;
+      if (tuned) {
+        // pushed first so the adaptation is the headline "why"
+        decisions.push({
+          code: 'VOLUME_ADAPTED',
+          params: {
+            completionPct: Math.round((tune.lastCompletionPct ?? 1) * 100),
+            restSec,
+            repAdj: tune.repAdj,
+            sets: n,
+            reps,
+            baseReps,
+            direction: tune.lastOutcome === 'crisp' ? 'rebuilding' : 'easier',
+          },
+        });
+      } else if (tune.lastOutcome === 'restored') {
+        // one-shot note: the last crisp day returned the tune to baseline
+        decisions.push({ code: 'VOLUME_RESTORED', params: { sets: n, reps, restSec } });
+      }
       decisions.push({
         code: 'SUBMAX_DERIVED',
         params: { sets: n, reps, bestMax: state.bwBestMaxSet },
@@ -224,7 +248,7 @@ export function generateSession(
       sets = Array.from({ length: n }, (_, i) => ({
         targetReps: reps,
         loadKg: 0,
-        restSecAfter: i === n - 1 ? 0 : C.VOLUME_REST_SEC,
+        restSecAfter: i === n - 1 ? 0 : restSec,
       }));
       break;
     }

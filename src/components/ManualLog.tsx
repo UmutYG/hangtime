@@ -54,7 +54,10 @@ export function ManualLog({
     if (!valid) return;
     // Editing keeps the session's identity (dayKind, cycle position, effort,
     // warm-up sets) — otherwise replaying history would rewind the schedule.
+    // Each edited set also keeps its original targetReps and rest data: rewriting
+    // targets to match actuals would make every edited session replay at 100 %.
     const warmups = initial?.sets.filter((s) => s.isWarmup) ?? [];
+    const original = initial?.sets.filter((s) => !s.isWarmup) ?? [];
     onSave({
       ...(initial ?? {}),
       id: initial?.id ?? `manual-${date}-${Math.random().toString(36).slice(2, 8)}`,
@@ -64,7 +67,12 @@ export function ManualLog({
       week: initial?.week ?? 0,
       sets: [
         ...warmups,
-        ...parsed.map((r) => ({ targetReps: r.reps, actualReps: r.reps, loadKg: r.loadKg })),
+        ...parsed.map((r, i) => ({
+          ...(original[i] ?? {}),
+          targetReps: original[i]?.targetReps ?? r.reps,
+          actualReps: r.reps,
+          loadKg: r.loadKg,
+        })),
       ],
     });
   };

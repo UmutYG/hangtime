@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Store } from '../engine/types';
+import { defaultVolumeTune } from '../engine/constants';
 
 const KEY = 'hangtime.store.v1';
 
@@ -30,6 +31,7 @@ export function emptyStore(): Store {
       e1rmKg: null,
       pendingDeload: false,
       lastSessionDate: null,
+      volumeTune: defaultVolumeTune(),
     },
     sessions: [],
     prs: [],
@@ -63,6 +65,7 @@ export function migrate(raw: unknown): Store {
     };
   }
   merged.state.weighted = { ...emptyStore().state.weighted, ...merged.state.weighted };
+  merged.state.volumeTune = { ...defaultVolumeTune(), ...(merged.state.volumeTune ?? {}) };
   return merged;
 }
 

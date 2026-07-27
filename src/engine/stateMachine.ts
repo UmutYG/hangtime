@@ -127,6 +127,7 @@ export function applyResult(
   let state: ProgramState = {
     ...prevState,
     weighted: { ...prevState.weighted },
+    volumeTune: { ...prevState.volumeTune },
     lastSessionDate: session.date,
   };
   const newPrs: PR[] = [];
@@ -246,10 +247,75 @@ export function applyResult(
       }
       return { state, newPrs, newTests, repsDone }; // no advance()
     }
-    case 'volume':
+    case 'volume': {
+      // Volume autoregulation — rest-first, never past baseline. Reads three
+      // signals: completion (Σactual/Σtarget), drop-off (last set vs first),
+      // and rest overage (taken vs planned, when the log has rest data).
+      if (exempt) break; // rough/layoff sessions are exempt — exempt means don't judge
+      const working = session.sets.filter((s) => !s.isWarmup);
+      if (working.length === 0) break;
+
+      const totalTarget = working.reduce((a, s) => a + s.targetReps, 0);
+      const totalActual = working.reduce((a, s) => a + s.actualReps, 0);
+      const completion = totalTarget > 0 ? totalActual / totalTarget : 1;
+
+      const first = working[0].actualReps;
+      const dropOff = first > 0 ? working[working.length - 1].actualReps / first : null;
+
+      const pairs = working.filter(
+        (s) => s.restSecTaken !== undefined && (s.restSecPlanned ?? 0) > 0
+      );
+      const restOverage =
+        pairs.length > 0
+          ? pairs.reduce((a, s) => a + s.restSecTaken! / s.restSecPlanned!, 0) / pairs.length
+          : null;
+
+      const t = prevState.volumeTune;
+      const stepUp = (r: number) => (r === C.VOLUME_REST_STEPS[0] ? C.VOLUME_REST_STEPS[1] : C.VOLUME_REST_STEPS[2]);
+      const stepDown = (r: number) => (r === C.VOLUME_REST_STEPS[2] ? C.VOLUME_REST_STEPS[1] : C.VOLUME_REST_STEPS[0]);
+
+      const breakdown =
+        completion < C.VOLUME_SHORTFALL_COMPLETION ||
+        (dropOff !== null && dropOff < C.VOLUME_BREAKDOWN_DROPOFF);
+      const crisp =
+        !breakdown &&
+        completion >= C.VOLUME_CRISP_COMPLETION &&
+        (dropOff === null || dropOff >= C.VOLUME_CRISP_DROPOFF) &&
+        (restOverage === null || restOverage <= C.VOLUME_CRISP_REST_OVERAGE);
+
+      let repAdj = t.repAdj;
+      let restSec = t.restSec;
+      let outcome: ProgramState['volumeTune']['lastOutcome'];
+      if (breakdown) {
+        restSec = stepUp(restSec);
+        repAdj = Math.max(C.VOLUME_REP_ADJ_FLOOR, repAdj - 1);
+        outcome = 'breakdown';
+      } else if (crisp) {
+        // step back toward baseline: rest first, then reps — never past baseline
+        if (restSec > C.VOLUME_REST_SEC) restSec = stepDown(restSec);
+        else if (repAdj < 0) repAdj += 1;
+        const wasTuned = t.restSec !== C.VOLUME_REST_SEC || t.repAdj !== 0;
+        const nowBaseline = restSec === C.VOLUME_REST_SEC && repAdj === 0;
+        outcome = wasTuned && nowBaseline ? 'restored' : 'crisp';
+      } else {
+        // moderate: completion ≥ .85 but not crisp, or rests stretched
+        restSec = stepUp(restSec);
+        outcome = 'moderate';
+      }
+
+      state.volumeTune = {
+        repAdj,
+        restSec,
+        lastCompletionPct: completion,
+        lastDropOff: dropOff,
+        lastRestOverage: restOverage,
+        lastOutcome: outcome,
+      };
+      break;
+    }
     case 'deloadVolume':
     case 'deloadHeavy':
-      break; // no state change — logged volume is its own reward
+      break; // no state change — deload is deload, never judged
     case 'max': {
       const best = bestBwSet(session);
       if (best > 0) {
@@ -267,6 +333,8 @@ export function applyResult(
         state.bwLastTestReps = best;
         recordBwPr(best);
         newTests.push({ quality: 'bwReps', value: best, date: session.date });
+        // a fresh max redefines the volume baseline — old rep/rest debt is stale
+        state.volumeTune = C.defaultVolumeTune();
       }
       break;
     }

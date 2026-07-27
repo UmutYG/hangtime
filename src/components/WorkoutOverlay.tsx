@@ -64,6 +64,9 @@ export function WorkoutOverlay({
   const [cursor, setCursor] = useState(0); // index into workingIdx
   const [actuals, setActuals] = useState<Record<number, number>>({});
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
+  // actual rest tracking: which set this rest follows, when it started, and per-set results
+  const [restMeta, setRestMeta] = useState<{ startedAt: number; forIdx: number } | null>(null);
+  const [restsTaken, setRestsTaken] = useState<Record<number, number>>({});
   const [now, setNow] = useState(Date.now());
   const [effort, setEffort] = useState<Effort>('right');
   const [saved, setSaved] = useState<{ prCount: number } | null>(null);
@@ -84,10 +87,22 @@ export function WorkoutOverlay({
     return () => clearInterval(id);
   }, [resting]);
   const restRemaining = resting ? Math.max(0, Math.ceil((restEndsAt! - now) / 1000)) : 0;
+
+  // single exit point for a rest — records the seconds the user actually watched
+  const endRest = () => {
+    if (restMeta) {
+      const sec = Math.max(0, Math.round((Date.now() - restMeta.startedAt) / 1000));
+      const forIdx = restMeta.forIdx;
+      setRestsTaken((r) => ({ ...r, [forIdx]: sec }));
+      setRestMeta(null);
+    }
+    setRestEndsAt(null);
+  };
+
   useEffect(() => {
     if (resting && restRemaining === 0) {
       haptic('success');
-      setRestEndsAt(null);
+      endRest();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resting, restRemaining === 0]);
@@ -116,6 +131,7 @@ export function WorkoutOverlay({
       const t = Date.now();
       setNow(t);
       setRestEndsAt(t + rest * 1000);
+      setRestMeta({ startedAt: t, forIdx: i });
     }
     setCursor((c) => c + 1);
   };
@@ -135,6 +151,8 @@ export function WorkoutOverlay({
       loadKg: s.loadKg,
       isWarmup: s.isWarmup,
       variationKey: s.variation?.key,
+      restSecTaken: restsTaken[i],
+      restSecPlanned: s.isWarmup ? undefined : s.restSecAfter,
     })),
   });
 
@@ -221,7 +239,7 @@ export function WorkoutOverlay({
             <Pressable onPress={() => setRestEndsAt((t) => (t ? t + 30_000 : t))} style={styles.lightBtn}>
               <Text style={styles.lightBtnText}>+30 s</Text>
             </Pressable>
-            <Pressable onPress={() => setRestEndsAt(null)} style={[styles.darkBtn, { flex: 1 }]}>
+            <Pressable onPress={endRest} style={[styles.darkBtn, { flex: 1 }]}>
               <Text style={styles.darkBtnText}>Skip rest</Text>
             </Pressable>
           </View>

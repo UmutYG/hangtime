@@ -1,5 +1,7 @@
 // All tunable numbers in one place, sourced from the researched programs.
 
+import type { VolumeTune } from './types';
+
 export const REP_RANGE = { bottom: 4, top: 6 } as const;
 export const HEAVY_SETS = 4;
 export const HEAVY_REST_SEC = 180;
@@ -20,6 +22,30 @@ export const VOLUME_SETS = 10;
 export const VOLUME_SETS_ROUGH = 8;
 export const VOLUME_PCT_OF_MAX = 0.5; // K Boges: 50 % of best max-effort set
 export const VOLUME_REST_SEC = 60;
+
+// Volume-day autoregulation — rest-first, deterministic, never past baseline.
+// Thresholds mirror velocity-loss research: ≤20 % set-to-set drop = quality zone,
+// ≥30 % = failure territory a sub-max day must avoid. Rest is the first lever
+// because short rests are what make reps fade across sets (rest-interval studies).
+export const VOLUME_REST_STEPS = [60, 75, 90] as const;
+export const VOLUME_REP_ADJ_FLOOR = -2;
+export const VOLUME_CRISP_COMPLETION = 0.95;
+export const VOLUME_CRISP_DROPOFF = 0.8; // ≤20 % drop from first set
+export const VOLUME_CRISP_REST_OVERAGE = 1.15;
+export const VOLUME_SHORTFALL_COMPLETION = 0.85; // below → breakdown
+export const VOLUME_MODERATE_REST_OVERAGE = 1.25;
+export const VOLUME_BREAKDOWN_DROPOFF = 0.7; // ≥30 % drop from first set
+
+export function defaultVolumeTune(): VolumeTune {
+  return {
+    repAdj: 0,
+    restSec: VOLUME_REST_SEC,
+    lastCompletionPct: null,
+    lastDropOff: null,
+    lastRestOverage: null,
+    lastOutcome: null,
+  };
+}
 
 export const MAX_DAY_SETS = 3;
 export const MAX_DAY_REST_SEC = 300;
