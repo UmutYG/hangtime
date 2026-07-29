@@ -52,6 +52,8 @@ export function explainShort(d: Decision): string {
       return `${p.days} days off → today is slightly reduced to ramp back in. It won't count against your progression.`;
     case 'POST_DELOAD_RESUME':
       return `Back from deload at −5 % load — a running start. You'll be past your old numbers within two weeks.`;
+    case 'VARIATION_BLOCKS':
+      return `Today's sets run in ${p.blocks} grip blocks — ${p.detail}. Same dose, different shapes.`;
     case 'VOLUME_ADAPTED':
       return p.direction === 'rebuilding'
         ? `Last volume day was crisp, so today steps back toward the full day: ${p.sets}×${p.reps} with ${p.restSec} s rests. Keep it clean and the baseline returns.`
@@ -95,6 +97,8 @@ export function explainDetail(d: Decision): string {
     case 'TEST_BW':
     case 'TEST_WEIGHTED':
       return `Tests happen only after easy days because fatigue hides fitness. The result updates your goal ETA and re-derives every target in the program — this is how the plan stays honest.`;
+    case 'VARIATION_BLOCKS':
+      return `Sub-max days are where variety is free: the dose still comes from your max, so changing grip costs nothing in adaptation and gives you a different shape to get good at. Rep targets scale with each grip — a wide-grip set is worth fewer reps than a chin-up because it genuinely is harder. Heavy days, max days and tests stay standard overhand pull-ups, because those are the numbers the whole program is built from.`;
     case 'VOLUME_ADAPTED':
       return `The program reads three things from your last volume day: how much of the target you completed, how far the last set fell from the first, and how your rests compared to plan. It adjusts rest first — research shows short rests are what make reps fade set to set — and only trims a rep when sets genuinely broke down (a 30 %+ drop is failure territory a sub-max day must avoid). Crisp days walk everything back toward the 10-set baseline; volume day never gets harder than baseline, because progress lives on max day.`;
     case 'VOLUME_RESTORED':

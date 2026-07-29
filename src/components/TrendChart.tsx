@@ -22,8 +22,9 @@ export function TrendChart({
   accent?: string;
 }) {
   if (points.length === 0) {
+    // no data deserves one quiet line, not a chart-sized void
     return (
-      <View style={[styles.empty, { height }]}>
+      <View style={[styles.empty, { height: 56 }]}>
         <Text style={styles.emptyText}>No data yet — it appears after your first sessions.</Text>
       </View>
     );

@@ -7,6 +7,8 @@ import { theme, mono, type } from '../theme';
 import { TrendChart, Point } from '../components/TrendChart';
 import { SettingsSheet } from '../components/SettingsSheet';
 import { ModeSwitch } from '../components/ModeSwitch';
+import { MasteryPath } from '../components/MasteryPath';
+import { pullMasteryPath } from '../engine/pullVariations';
 
 type Metric = 'e1rm' | 'bwMax';
 type Range = '1m' | '3m' | 'all';
@@ -97,7 +99,7 @@ export function ProgressScreen() {
         </View>
         <View style={styles.stat}>
           <Text style={[styles.statValue, mono]}>{weeksActive}</Text>
-          <Text style={styles.statLabel}>weeks trained</Text>
+          <Text style={styles.statLabel}>{weeksActive === 1 ? 'week trained' : 'weeks trained'}</Text>
         </View>
       </View>
 
@@ -152,6 +154,8 @@ export function ProgressScreen() {
           </Text>
         ) : null}
       </View>
+
+      <MasteryPath path={pullMasteryPath(store.sessions)} accent={theme.accent} />
 
       <View style={styles.card}>
         <Text style={type.kickerDim}>PERSONAL RECORDS</Text>

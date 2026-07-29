@@ -70,6 +70,15 @@ export const SESSIONS_AT_LOAD_FOR_MICRO = 3;
 export const LAYOFF_DAYS = 8; // > 7 days gap triggers ramp-back session
 export const LAYOFF_LOAD_FACTOR = 0.95;
 
+/**
+ * A test can raise your max freely but only lower it this far in one go.
+ * Four weeks of training does not cost 40 % of your strength-endurance, so a
+ * huge drop is almost always a bad day (illness, sleep, timing) rather than a
+ * true result — and an un-capped drop would drag every volume target with it.
+ * A genuinely lower max still gets there, it just takes two tests.
+ */
+export const TEST_MAX_DROP_FACTOR = 0.85;
+
 /** working load seeded from calibration ≈ a load allowing ~6 clean reps */
 export const CALIBRATION_TARGET_REPS = 6;
 export const CALIBRATION_E1RM_FACTOR = 0.82;

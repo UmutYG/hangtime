@@ -1,18 +1,16 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { LoggedSession } from '../engine/types';
-import { pushMasteryPath } from '../engine/pushups';
+import { PushMasteryTier } from '../engine/pushups';
 import { theme, mono, type } from '../theme';
 
 // The movement library — a celebration layer, never a gate. Tiers dim until
 // earlier shapes add up, but every rep you've ever done shows regardless.
-export function MasteryPath({ sessions }: { sessions: LoggedSession[] }) {
-  const path = useMemo(() => pushMasteryPath(sessions), [sessions]);
+export function MasteryPath({ path, accent }: { path: PushMasteryTier[]; accent: string }) {
   const maxReps = Math.max(1, ...path.flatMap((t) => t.items.map((i) => i.reps)));
 
   return (
     <View style={styles.card}>
-      <Text style={[type.kickerDim, { color: theme.push }]}>MOVEMENT LIBRARY</Text>
+      <Text style={[type.kickerDim, { color: accent }]}>MOVEMENT LIBRARY</Text>
       {path.map((tier) => (
         <View key={tier.title} style={[styles.tier, !tier.open && styles.tierClosed]}>
           <View style={styles.tierHeader}>
@@ -26,7 +24,7 @@ export function MasteryPath({ sessions }: { sessions: LoggedSession[] }) {
                 <View
                   style={[
                     styles.barFill,
-                    { width: `${Math.min(100, (reps / maxReps) * 100)}%` },
+                    { width: `${Math.min(100, (reps / maxReps) * 100)}%`, backgroundColor: accent },
                   ]}
                 />
               </View>
@@ -66,7 +64,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.cardMuted,
     overflow: 'hidden',
   },
-  barFill: { height: 5, borderRadius: 3, backgroundColor: theme.push, opacity: 0.75 },
+  barFill: { height: 5, borderRadius: 3, opacity: 0.75 },
   reps: { fontSize: 12, color: theme.textDim, width: 44, textAlign: 'right' },
   footer: { fontSize: 12, color: theme.textFaint, lineHeight: 17.5 },
 });

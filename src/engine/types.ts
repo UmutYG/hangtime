@@ -84,6 +84,7 @@ export type ReasonCode =
   | 'READINESS_TRIM'
   | 'LAYOFF_RAMP'
   | 'POST_DELOAD_RESUME'
+  | 'VARIATION_BLOCKS'
   | 'VOLUME_ADAPTED'
   | 'VOLUME_RESTORED';
 

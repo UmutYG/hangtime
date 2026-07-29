@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { computePushGoal, PUSH_MILESTONES } from '../engine/pushups';
+import { computePushGoal, pushMasteryPath, PUSH_MILESTONES } from '../engine/pushups';
 import { useStore } from '../hooks/useStore';
 import { theme, mono, type } from '../theme';
 import { ModeSwitch } from '../components/ModeSwitch';
@@ -66,7 +66,7 @@ export function PushProgressScreen() {
         </View>
         <View style={styles.stat}>
           <Text style={[styles.statValue, mono]}>{weeksActive}</Text>
-          <Text style={styles.statLabel}>weeks trained</Text>
+          <Text style={styles.statLabel}>{weeksActive === 1 ? 'week trained' : 'weeks trained'}</Text>
         </View>
       </View>
 
@@ -97,7 +97,7 @@ export function PushProgressScreen() {
         )}
       </View>
 
-      <MasteryPath sessions={store.pushSessions} />
+      <MasteryPath path={pushMasteryPath(store.pushSessions)} accent={theme.push} />
 
       <View style={styles.card}>
         <Text style={[type.kickerDim, { color: theme.push }]}>PERSONAL RECORDS</Text>

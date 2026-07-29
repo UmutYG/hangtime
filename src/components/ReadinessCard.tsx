@@ -51,8 +51,8 @@ export function ReadinessCard({
       {readiness.suggestion ? (
         <Text style={[styles.suggestion, { color: accent }]}>
           {readiness.suggestion === 'rough'
-            ? 'Suggested: trim today’s session — tap “Good” to override.'
-            : 'Suggested: take it as it comes — tap “Good” to train full.'}
+            ? 'Your recent load is high. Worth easing off — the session is still yours to take.'
+            : 'Some fatigue in the system. Nothing alarming, just worth knowing.'}
         </Text>
       ) : null}
       {jointCheck ? (

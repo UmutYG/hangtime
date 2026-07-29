@@ -9,6 +9,7 @@ import {
 } from './types';
 import * as C from './constants';
 import { buildWhy } from './explain';
+import { pullVariationFor, pullVolumeBlocks } from './pullVariations';
 import { e1rmSystem, repsAtLoad, roundToIncrement } from './epley';
 
 export function initialState(profile: Profile): ProgramState {
@@ -241,15 +242,35 @@ export function generateSession(
         // one-shot note: the last crisp day returned the tune to baseline
         decisions.push({ code: 'VOLUME_RESTORED', params: { sets: n, reps, restSec } });
       }
+      // grip blocks: same proven dose, the hands move around it
+      const blocks = pullVolumeBlocks(state, n, reps);
+      for (const block of blocks) {
+        for (let i = 0; i < block.sets; i++) {
+          sets.push({
+            targetReps: block.reps,
+            loadKg: 0,
+            restSecAfter: restSec,
+            variation: {
+              key: block.variation.key,
+              name: block.variation.name,
+              flavor: block.variation.flavor,
+            },
+            note: i === 0 ? `${block.variation.name} — ${block.variation.flavor}.` : undefined,
+          });
+        }
+      }
+      if (sets.length > 0) sets[sets.length - 1].restSecAfter = 0;
+      decisions.push({
+        code: 'VARIATION_BLOCKS',
+        params: {
+          blocks: blocks.length,
+          detail: blocks.map((b) => `${b.sets}×${b.reps} ${b.variation.name.toLowerCase()}`).join(', '),
+        },
+      });
       decisions.push({
         code: 'SUBMAX_DERIVED',
         params: { sets: n, reps, bestMax: state.bwBestMaxSet },
       });
-      sets = Array.from({ length: n }, (_, i) => ({
-        targetReps: reps,
-        loadKg: 0,
-        restSecAfter: i === n - 1 ? 0 : restSec,
-      }));
       break;
     }
     case 'max': {
@@ -271,13 +292,26 @@ export function generateSession(
       const ladders = rough ? C.LADDER_COUNT - 1 : C.LADDER_COUNT;
       decisions.push({ code: 'LADDER_DAY', params: { topRung: top } });
       for (let l = 0; l < ladders; l++) {
-        for (let r = 1; r <= top; r++) {
+        // every ladder gets its own shape — this is the play day
+        const variation = pullVariationFor(state, l);
+        const ladderTop = Math.max(2, Math.round(top * variation.scale));
+        for (let r = 1; r <= ladderTop; r++) {
           sets.push({
             targetReps: r,
             loadKg: 0,
             ladder: { ladderIndex: l + 1, rung: r },
+            variation: {
+              key: variation.key,
+              name: variation.name,
+              flavor: variation.flavor,
+            },
             restSecAfter:
-              r === top ? (l === ladders - 1 ? 0 : C.LADDER_REST_SEC) : C.LADDER_RUNG_REST_SEC,
+              r === ladderTop
+                ? l === ladders - 1
+                  ? 0
+                  : C.LADDER_REST_SEC
+                : C.LADDER_RUNG_REST_SEC,
+            note: r === 1 ? `Ladder ${l + 1}: ${variation.name} — ${variation.flavor}.` : undefined,
           });
         }
       }

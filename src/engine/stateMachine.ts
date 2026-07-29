@@ -329,8 +329,15 @@ export function applyResult(
     case 'testBw': {
       const best = bestBwSet(session);
       if (best > 0) {
-        state.bwBestMaxSet = best;
-        state.bwLastTestReps = best;
+        // Raises freely; a drop is floored so one bad test can't crater the block.
+        // The chart records what you actually did — only the engine's working
+        // baseline is floored, and a real decline still lands over two tests.
+        const accepted = Math.max(
+          best,
+          Math.round(prevState.bwLastTestReps * C.TEST_MAX_DROP_FACTOR)
+        );
+        state.bwBestMaxSet = accepted;
+        state.bwLastTestReps = accepted;
         recordBwPr(best);
         newTests.push({ quality: 'bwReps', value: best, date: session.date });
         // a fresh max redefines the volume baseline — old rep/rest debt is stale

@@ -1,11 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { computePushGoal, generatePushSession } from '../engine/pushups';
-import { Readiness } from '../engine/types';
 import { useStore } from '../hooks/useStore';
 import { useWorkout } from '../hooks/useWorkout';
 import { theme, mono, modeIdentity, type } from '../theme';
-import { cycleMilestoneDates, fmtScheduleDate } from '../engine/schedule';
+import { cycleMilestoneDates, fmtScheduleDate, setsRepsLabel } from '../engine/schedule';
 import { ModeSwitch } from '../components/ModeSwitch';
 import { ModeMark } from '../components/ModeMark';
 import { ProgressRing } from '../components/ProgressRing';
@@ -22,26 +21,18 @@ function todayLabel(): string {
   return new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
-const READINESS: Array<{ key: Readiness; label: string }> = [
-  { key: 'good', label: 'Good' },
-  { key: 'ok', label: 'OK' },
-  { key: 'rough', label: 'Rough' },
-];
-
 export function PushTodayScreen() {
   const { store, setPushMax } = useStore();
   const workout = useWorkout();
-  const [readiness, setReadiness] = useState<Readiness | undefined>();
   const [whyOpen, setWhyOpen] = useState(false);
   const [maxText, setMaxText] = useState('');
 
   const push = store.pushState;
   const readinessInfo = useReadiness('push');
-  const effectiveReadiness = readiness ?? readinessInfo.suggestion;
-
+  // Readiness informs; the engine learns from what the session actually was.
   const plan = useMemo(
-    () => (push ? generatePushSession(push, effectiveReadiness, todayIso()) : null),
-    [push, effectiveReadiness]
+    () => (push ? generatePushSession(push, undefined, todayIso()) : null),
+    [push]
   );
 
   const doneToday = store.pushSessions.some(
@@ -92,9 +83,7 @@ export function PushTodayScreen() {
 
   const workingSets = plan!.sets.filter((s) => !s.isWarmup);
   const setsLabel =
-    plan!.dayKind === 'pushLadder'
-      ? `${workingSets.length} rungs`
-      : `${workingSets.length}×${workingSets[0].amrap ? `${workingSets[0].targetReps}+` : workingSets[0].targetReps}`;
+    plan!.dayKind === 'pushLadder' ? `${workingSets.length} rungs` : setsRepsLabel(workingSets);
   const restLabel = workingSets[0]
     ? `${Math.floor(workingSets[0].restSecAfter / 60)}:${(workingSets[0].restSecAfter % 60).toString().padStart(2, '0')}`
     : '—';
@@ -114,11 +103,6 @@ export function PushTodayScreen() {
         <View>
           <Text style={styles.dateLabel}>{todayLabel()}</Text>
           <Text style={type.hero}>Today</Text>
-        </View>
-        <View style={styles.cycleChip}>
-          <Text style={styles.cycleChipText}>
-            CYCLE {push.cycle} · WEEK {push.week}
-          </Text>
         </View>
       </View>
       <View style={styles.mottoRow}>
@@ -170,23 +154,7 @@ export function PushTodayScreen() {
               <Text style={styles.statCaption}>rest</Text>
             </View>
           </View>
-          <View style={styles.readinessRow}>
-            {READINESS.map((r) => (
-              <Pressable
-                key={r.key}
-                onPress={() => setReadiness(r.key)}
-                style={[
-                  styles.readinessChip,
-                  effectiveReadiness === r.key && { backgroundColor: theme.push, borderColor: theme.push },
-                ]}
-              >
-                <Text style={[styles.readinessChipText, effectiveReadiness === r.key && { color: '#FFF' }]}>
-                  {r.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Pressable onPress={() => workout.start(plan!, effectiveReadiness)} style={styles.startBtn}>
+          <Pressable onPress={() => workout.start(plan!, undefined)} style={styles.startBtn}>
             <Text style={styles.startBtnText}>{modeIdentity('pushups').verb}</Text>
           </Pressable>
         </View>
@@ -195,7 +163,10 @@ export function PushTodayScreen() {
       <View style={styles.ringCard}>
         <ProgressRing size={52} stroke={5} fraction={weekFraction} color={theme.push} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.ringTitle}>Week {push.week} of 4</Text>
+          <Text style={styles.ringTitle}>
+            Week {push.week} of 4
+            {push.cycle > 1 ? ` · cycle ${push.cycle}` : ''}
+          </Text>
           <Text style={styles.ringSub}>
             {milestones.sessionsToDeload > 1 && milestones.deload
               ? `Deload ${fmtScheduleDate(milestones.deload, todayIso())}`
@@ -239,15 +210,6 @@ const styles = StyleSheet.create({
   mottoRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -6 },
   mottoText: { color: theme.textFaint, fontSize: 12.5, fontWeight: '500', letterSpacing: 0.1 },
   dateLabel: { color: theme.textFaint, fontSize: 13, fontWeight: '500' },
-  cycleChip: {
-    backgroundColor: theme.cardMuted,
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  cycleChipText: { color: theme.textDim, fontSize: 11, fontWeight: '600', letterSpacing: 0.6 },
   card: {
     backgroundColor: theme.card,
     borderWidth: 1,

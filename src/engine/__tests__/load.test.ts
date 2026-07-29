@@ -6,6 +6,7 @@ import {
   OVERLAP,
   runLoad,
   sessionLoad,
+  sessionRpe,
   weeklyLoad,
 } from '../load';
 import { LoggedSession } from '../types';
@@ -91,7 +92,7 @@ describe('cross-modal overlap is asymmetric and honest', () => {
 
   it('a hard pull session drops push readiness less than it drops pull readiness', () => {
     const entries: LoadEntry[] = [
-      { date: '2026-07-19', modality: 'pull', load: 400, label: 'heavy' },
+      { date: '2026-07-19', modality: 'pull', load: 400, label: 'heavy', rpe: 8 },
     ];
     const pull = computeReadiness('pull', entries, '2026-07-20');
     const push = computeReadiness('push', entries, '2026-07-20');
@@ -110,7 +111,7 @@ describe('readiness', () => {
 
   it('recovers as days pass (exponential decay)', () => {
     const mk = (date: string): LoadEntry[] => [
-      { date, modality: 'pull', load: 400, label: 'heavy' },
+      { date, modality: 'pull', load: 400, label: 'heavy', rpe: 8 },
     ];
     const sameDay = computeReadiness('pull', mk('2026-07-20'), '2026-07-20').score;
     const twoDays = computeReadiness('pull', mk('2026-07-18'), '2026-07-20').score;
@@ -121,8 +122,8 @@ describe('readiness', () => {
 
   it('suggests trimming when deeply fatigued, and explains why', () => {
     const entries: LoadEntry[] = [
-      { date: '2026-07-19', modality: 'pull', load: 600, label: 'heavy' },
-      { date: '2026-07-20', modality: 'pull', load: 600, label: 'max' },
+      { date: '2026-07-19', modality: 'pull', load: 600, label: 'heavy', rpe: 8 },
+      { date: '2026-07-20', modality: 'pull', load: 600, label: 'max', rpe: 8 },
     ];
     const r = computeReadiness('pull', entries, '2026-07-20');
     expect(r.level).toBe('fatigued');
@@ -136,13 +137,13 @@ describe('readiness', () => {
     for (let i = 27; i >= 8; i -= 2) {
       const d = new Date('2026-07-20');
       d.setDate(d.getDate() - i);
-      entries.push({ date: d.toISOString().slice(0, 10), modality: 'run', load: 100, label: 'run' });
+      entries.push({ date: d.toISOString().slice(0, 10), modality: 'run', load: 100, label: 'run', rpe: 8 });
     }
     // then a huge last week
     for (let i = 6; i >= 1; i--) {
       const d = new Date('2026-07-20');
       d.setDate(d.getDate() - i);
-      entries.push({ date: d.toISOString().slice(0, 10), modality: 'run', load: 500, label: 'run' });
+      entries.push({ date: d.toISOString().slice(0, 10), modality: 'run', load: 500, label: 'run', rpe: 8 });
     }
     const r = computeReadiness('run', entries, '2026-07-20');
     expect(r.loadRatio).not.toBeNull();
@@ -202,7 +203,7 @@ describe('joint check-in', () => {
     const sore = computeReadiness('pull', entries, '2026-07-27', null, 'sore');
     expect(sore.score).toBe(55);
     expect(sore.level).toBe('ready');
-    const loaded: LoadEntry[] = [{ date: '2026-07-26', modality: 'pull', load: 300, label: 'heavy' }];
+    const loaded: LoadEntry[] = [{ date: '2026-07-26', modality: 'pull', load: 300, label: 'heavy', rpe: 8 }];
     const both = computeReadiness('pull', loaded, '2026-07-27', null, 'sore');
     expect(both.suggestion).toBeDefined(); // fatigue + sore joints → trims
   });
@@ -216,5 +217,59 @@ describe('joint check-in', () => {
     const r = computeReadiness('pull', entries, '2026-07-27', { score: 60, source: 'Oura', date: '2026-07-27' }, 'tender');
     expect(r.score).toBe(64); // (100 + 60) / 2 = 80, then × 0.8
     expect(r.reasons.join(' ')).toContain('Oura');
+  });
+});
+
+describe('load reads what the session actually was', () => {
+  const faded = (): LoggedSession => ({
+    id: 'v', date: '2026-07-29', dayKind: 'volume', cycle: 1, week: 2,
+    sets: [10, 10, 10, 10, 8, 8, 8, 8, 6, 6].map((r) => ({
+      targetReps: 10, actualReps: r, loadKg: 0, restSecTaken: 90, restSecPlanned: 60,
+    })),
+  });
+  const clean = (): LoggedSession => ({
+    id: 'v2', date: '2026-07-29', dayKind: 'volume', cycle: 1, week: 2,
+    sets: Array.from({ length: 10 }, () => ({
+      targetReps: 10, actualReps: 10, loadKg: 0, restSecTaken: 60, restSecPlanned: 60,
+    })),
+  });
+
+  it('a volume day that fell apart costs far more than one that did not', () => {
+    expect(sessionRpe(faded())).toBeGreaterThan(sessionRpe(clean()));
+    expect(sessionLoad(faded())).toBeGreaterThan(sessionLoad(clean()) * 1.5);
+  });
+
+  it('a faded volume day approaches the cost of a heavy day', () => {
+    const heavy = session('2026-07-27', 'heavy', 9, 5);
+    expect(sessionLoad(faded())).toBeGreaterThan(sessionLoad(heavy) * 0.7);
+  });
+
+  it('sub-max volume is no longer treated as an easy day', () => {
+    expect(sessionRpe(clean())).toBeGreaterThanOrEqual(7);
+  });
+
+  it('needing longer rests than planned raises the cost', () => {
+    const asPlanned = clean();
+    const stretched: LoggedSession = {
+      ...asPlanned,
+      sets: asPlanned.sets.map((s) => ({ ...s, restSecTaken: 100 })),
+    };
+    expect(sessionRpe(stretched)).toBeGreaterThan(sessionRpe(asPlanned));
+  });
+
+  it('hard sessions linger longer than easy ones', () => {
+    const hard: LoadEntry[] = [{ date: '2026-07-27', modality: 'pull', load: 300, label: 'max', rpe: 9 }];
+    const easy: LoadEntry[] = [{ date: '2026-07-27', modality: 'pull', load: 300, label: 'ladder', rpe: 6 }];
+    const after3 = (e: LoadEntry[]) => computeReadiness('pull', e, '2026-07-30').score;
+    expect(after3(hard)).toBeLessThan(after3(easy));
+  });
+
+  it('a week of five hard sessions is finally noticed', () => {
+    const dates = ['2026-07-27', '2026-07-28', '2026-07-29', '2026-07-30', '2026-07-31'];
+    const entries: LoadEntry[] = dates.map((date, i) => ({
+      date, modality: i % 2 === 0 ? 'pull' : 'push', load: 220, label: 'heavy', rpe: 8,
+    }));
+    const r = computeReadiness('pull', entries, '2026-08-01');
+    expect(r.level).toBe('fatigued');
   });
 });

@@ -28,6 +28,8 @@ export interface LoadEntry {
   modality: Modality;
   load: number;
   label: string;
+  /** how hard the session actually was — drives how long its fatigue lingers */
+  rpe: number;
 }
 
 /** How much a session in one modality taxes readiness in another (0–1). */
@@ -38,23 +40,85 @@ export const OVERLAP: Record<Modality, Record<Modality, number>> = {
   run: { run: 1.0, pull: 0.2, push: 0.2 },
 };
 
-/** Baseline session RPE by day type — before your logged effort adjusts it. */
+/**
+ * Baseline session RPE by day type — the starting point, before what actually
+ * happened adjusts it.
+ *
+ * Sub-max volume days sit at 7, not the 6 they used to: ten sets with 60 s
+ * rests taken close to failure by the end is genuinely hard work, and the
+ * evidence is that moderate-load high-volume training produces *more* fatigue
+ * than heavy low-rep work, not less. Scoring it as an easy day was the single
+ * biggest reason readiness recovered faster than a body does.
+ */
 export function baseRpe(dayKind: string): number {
   if (dayKind.includes('Deload') || dayKind.includes('deload')) return 4;
   if (['max', 'testBw', 'testWeighted', 'pushMax', 'pushTest'].includes(dayKind)) return 9;
   if (['heavy', 'pushPyramid', 'calibration'].includes(dayKind)) return 8;
+  if (['volume', 'pushVolume'].includes(dayKind)) return 7;
   if (['ladder', 'pushLadder'].includes(dayKind)) return 6.5;
-  if (['volume', 'pushVolume'].includes(dayKind)) return 6;
   return 7; // custom / manual logs
 }
 
 const EFFORT_ADJ: Record<Effort, number> = { easy: -1, right: 0, grind: 1 };
 
+/**
+ * What the session actually cost, not what it was supposed to cost.
+ *
+ * A day type only sets the expectation. Missing targets, watching the late
+ * sets fall apart, or needing longer rests than planned all mean the session
+ * was harder than the plan assumed — and each of those is recorded in the log,
+ * so the load model can read them instead of guessing.
+ */
+export function sessionRpe(session: LoggedSession): number {
+  let rpe = baseRpe(session.dayKind);
+  if (session.lastSetEffort) rpe += EFFORT_ADJ[session.lastSetEffort];
+
+  const working = session.sets.filter((s) => !s.isWarmup);
+  if (working.length > 0) {
+    const target = working.reduce((a, s) => a + s.targetReps, 0);
+    const actual = working.reduce((a, s) => a + s.actualReps, 0);
+    if (target > 0) {
+      const completion = actual / target;
+      if (completion < 0.85) rpe += 1.5;
+      else if (completion < 0.95) rpe += 0.75;
+    }
+
+    // did the back half fall away from the front half?
+    const third = Math.max(1, Math.floor(working.length / 3));
+    const fulfil = (slice: typeof working) => {
+      const usable = slice.filter((s) => s.targetReps > 0);
+      return usable.length
+        ? usable.reduce((a, s) => a + s.actualReps / s.targetReps, 0) / usable.length
+        : null;
+    };
+    const early = fulfil(working.slice(0, third));
+    const late = fulfil(working.slice(-third));
+    if (early !== null && late !== null && early > 0) {
+      const fade = late / early;
+      if (fade < 0.7) rpe += 1;
+      else if (fade < 0.85) rpe += 0.5;
+    }
+
+    // needing more rest than planned is the body asking for it
+    const rested = working.filter(
+      (s) => s.restSecTaken !== undefined && (s.restSecPlanned ?? 0) > 0
+    );
+    if (rested.length > 0) {
+      const overage =
+        rested.reduce((a, s) => a + s.restSecTaken! / s.restSecPlanned!, 0) / rested.length;
+      if (overage > 1.25) rpe += 0.5;
+    }
+  }
+
+  return Math.max(3, Math.min(10, rpe));
+}
+
 /** Estimated wall-clock minutes: ~3 s per rep plus rests — measured rests when
  *  the log has them (newer sessions), estimated by day type for the gaps that don't. */
 export function sessionDurationMin(session: LoggedSession): number {
   const reps = session.sets.reduce((sum, s) => sum + s.actualReps, 0);
-  const workSec = reps * 3;
+  // ~3 s a rep, plus ~12 s per set of chalking up, getting to the bar, resetting
+  const workSec = reps * 3 + session.sets.length * 12;
   const measured = session.sets.filter((s) => s.restSecTaken !== undefined);
   const measuredSec = measured.reduce((sum, s) => sum + (s.restSecTaken ?? 0), 0);
   const restPerSet = baseRpe(session.dayKind) >= 8 ? 150 : 60;
@@ -63,15 +127,11 @@ export function sessionDurationMin(session: LoggedSession): number {
 }
 
 export function sessionLoad(session: LoggedSession): number {
-  const rpe = Math.max(
-    3,
-    Math.min(10, baseRpe(session.dayKind) + (session.lastSetEffort ? EFFORT_ADJ[session.lastSetEffort] : 0))
-  );
-  return Math.round(sessionDurationMin(session) * rpe);
+  return Math.round(sessionDurationMin(session) * sessionRpe(session));
 }
 
-/** Runs: duration × RPE, where RPE rises as the run approaches your best pace. */
-export function runLoad(run: Run, bestPaceSecPerKm: number | null): number {
+/** Runs: RPE rises as the run approaches your best pace. */
+export function runRpe(run: Run, bestPaceSecPerKm: number | null): number {
   const minutes = run.durationSec / 60;
   let rpe = 6;
   const pace = paceSecPerKm(run);
@@ -82,7 +142,12 @@ export function runLoad(run: Run, bestPaceSecPerKm: number | null): number {
     else if (ratio >= 1.4) rpe = 5;
   }
   if (minutes > 75) rpe += 0.5; // long runs cost more than pace suggests
-  return Math.round(minutes * rpe);
+  return rpe;
+}
+
+/** Runs: duration × RPE. */
+export function runLoad(run: Run, bestPaceSecPerKm: number | null): number {
+  return Math.round((run.durationSec / 60) * runRpe(run, bestPaceSecPerKm));
 }
 
 function daysBetween(fromIso: ISODate, toIso: ISODate): number {
@@ -91,9 +156,22 @@ function daysBetween(fromIso: ISODate, toIso: ISODate): number {
   return Math.max(0, Math.round((b - a) / 86_400_000));
 }
 
-/** Exponential decay of acute fatigue — half-life 2 days. */
-function decay(daysAgo: number): number {
-  return Math.pow(0.5, daysAgo / 2);
+/**
+ * How long a session's fatigue lingers, by how hard it actually was.
+ *
+ * A flat 2-day half-life treated an all-out max day like an easy ladder day.
+ * The evidence separates them: light and jump-type work clears in ~48 h, while
+ * heavy resistance work depresses neuromuscular function for ~72 h and
+ * sometimes longer. So the half-life scales with the session's RPE.
+ */
+function halfLifeDays(rpe: number): number {
+  if (rpe >= 8.5) return 3;
+  if (rpe >= 7) return 2.5;
+  return 1.5;
+}
+
+function decay(daysAgo: number, rpe: number): number {
+  return Math.pow(0.5, daysAgo / halfLifeDays(rpe));
 }
 
 /** Recovery capacity floor, in load units — roughly one hard session per day. */
@@ -142,7 +220,7 @@ export function computeReadiness(
   for (const e of recent) {
     const d = daysBetween(e.date, today);
     if (d > 10) continue;
-    acute += e.load * OVERLAP[e.modality][modality] * decay(d);
+    acute += e.load * OVERLAP[e.modality][modality] * decay(d, e.rpe);
   }
 
   const total28 = recent.reduce((sum, e) => sum + e.load, 0);
@@ -264,18 +342,21 @@ export function buildLoadEntries(
       modality: 'pull' as Modality,
       load: sessionLoad(s),
       label: s.dayKind,
+      rpe: sessionRpe(s),
     })),
     ...pushSessions.map((s) => ({
       date: s.date,
       modality: 'push' as Modality,
       load: sessionLoad(s),
       label: s.dayKind,
+      rpe: sessionRpe(s),
     })),
     ...runs.map((r) => ({
       date: r.date,
       modality: 'run' as Modality,
       load: runLoad(r, bestPaceSecPerKm),
       label: `${r.distanceKm} km`,
+      rpe: runRpe(r, bestPaceSecPerKm),
     })),
   ];
   return entries.sort((a, b) => a.date.localeCompare(b.date));

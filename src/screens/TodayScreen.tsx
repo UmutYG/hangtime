@@ -1,11 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { generateSession } from '../engine/generator';
-import { Readiness } from '../engine/types';
 import { useStore } from '../hooks/useStore';
 import { useWorkout } from '../hooks/useWorkout';
 import { theme, mono, modeIdentity, type } from '../theme';
-import { cycleMilestoneDates, fmtScheduleDate, isTrainingDay } from '../engine/schedule';
+import { cycleMilestoneDates, fmtScheduleDate, isTrainingDay, setsRepsLabel } from '../engine/schedule';
 import { ModeMark } from '../components/ModeMark';
 import { WhyCard } from '../components/WhyCard';
 import { WhySheet } from '../components/WhySheet';
@@ -24,27 +23,20 @@ function todayLabel(): string {
   return new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
-const READINESS: Array<{ key: Readiness; label: string }> = [
-  { key: 'good', label: 'Good' },
-  { key: 'ok', label: 'OK' },
-  { key: 'rough', label: 'Rough' },
-];
-
 export function TodayScreen() {
   const { store } = useStore();
   const workout = useWorkout();
-  const [readiness, setReadiness] = useState<Readiness | undefined>();
   const [whyOpen, setWhyOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const { editSession } = useStore();
 
   const profile = store.profile!;
   const readinessInfo = useReadiness('pull');
-  // the engine suggests; you always have the final tap
-  const effectiveReadiness = readiness ?? readinessInfo.suggestion;
+  // Readiness informs but never rewrites the plan: how the session actually goes
+  // (reps hit, rest taken) is what the engine reads afterwards.
   const plan = useMemo(
-    () => generateSession(profile, store.state, todayIso(), effectiveReadiness),
-    [profile, store.state, effectiveReadiness]
+    () => generateSession(profile, store.state, todayIso()),
+    [profile, store.state]
   );
 
   const doneToday = store.sessions.some((s) => s.date === todayIso() && s.dayKind !== 'custom');
@@ -63,16 +55,13 @@ export function TodayScreen() {
 
   const workingSets = plan.sets.filter((s) => !s.isWarmup);
   const maxLoad = Math.max(0, ...plan.sets.map((s) => s.loadKg));
-  const repsRange = workingSets.length
-    ? `${workingSets.length}×${workingSets[0].amrap ? `${workingSets[0].targetReps}+` : workingSets[0].targetReps}`
-    : '—';
+  const repsRange = setsRepsLabel(workingSets);
   const restLabel = workingSets[0]
     ? `${Math.floor(workingSets[0].restSecAfter / 60)}:${(workingSets[0].restSecAfter % 60)
         .toString()
         .padStart(2, '0')}`
     : '—';
 
-  const e1rmDisplay = store.state.e1rmKg ? Math.round(store.state.e1rmKg * 10) / 10 : null;
   const weekFraction = (store.state.week - 1 + Math.min(store.state.sessionInWeek, 3) / 3) / 4;
   // real dates from the training days picked at onboarding — not session counts
   const milestones = useMemo(
@@ -97,11 +86,6 @@ export function TodayScreen() {
             {!scheduledToday ? ' · not a training day' : ''}
           </Text>
           <Text style={type.hero}>Today</Text>
-        </View>
-        <View style={styles.cycleChip}>
-          <Text style={styles.cycleChipText}>
-            CYCLE {plan.cycle} · WEEK {plan.week}
-          </Text>
         </View>
       </View>
       <View style={styles.mottoRow}>
@@ -143,7 +127,6 @@ export function TodayScreen() {
               <Text style={styles.whyPillText}>Why?</Text>
             </Pressable>
           </View>
-          <Text style={styles.sessionTitle}>{plan.title.replace(/^(Vest|Heavy|Volume|Max|Ladder|Deload).*—\s*/, '')}</Text>
           <View style={styles.statRow3}>
             <View>
               <Text style={[styles.statBig, mono]}>{repsRange}</Text>
@@ -161,24 +144,8 @@ export function TodayScreen() {
             </View>
           </View>
 
-          <View style={styles.readinessRow}>
-            {READINESS.map((r) => (
-              <Pressable
-                key={r.key}
-                onPress={() => setReadiness(readiness === r.key ? undefined : r.key)}
-                style={[styles.readinessChip, readiness === r.key && styles.readinessChipActive]}
-              >
-                <Text
-                  style={[styles.readinessChipText, readiness === r.key && { color: theme.onAccent }]}
-                >
-                  {r.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
           <Pressable
-            onPress={() => workout.start(plan, effectiveReadiness)}
+            onPress={() => workout.start(plan, undefined)}
             style={styles.startBtn}
           >
             <Text style={styles.startBtnText}>{modeIdentity('pullups').verb}</Text>
@@ -189,23 +156,17 @@ export function TodayScreen() {
       <View style={styles.ringCard}>
         <ProgressRing size={52} stroke={5} fraction={weekFraction} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.ringTitle}>Week {store.state.week} of 4</Text>
+          <Text style={styles.ringTitle}>
+            Week {store.state.week} of 4
+            {store.state.cycle > 1 ? ` · cycle ${store.state.cycle}` : ''}
+          </Text>
           <Text style={styles.ringSub}>
             {milestones.sessionsToDeload > 1 && milestones.deload
               ? `Deload ${fmtScheduleDate(milestones.deload, todayIso())}`
               : 'Deload week — retest coming up'}
+            {'  ·  '}
+            <Text style={mono}>{store.state.bwLastTestReps}</Text> rep max
           </Text>
-        </View>
-      </View>
-
-      <View style={styles.statPairRow}>
-        <View style={styles.statTile}>
-          <Text style={styles.statTileLabel}>EST. 1RM</Text>
-          <Text style={[styles.statTileValue, mono]}>{e1rmDisplay ? `${e1rmDisplay} kg` : '—'}</Text>
-        </View>
-        <View style={styles.statTile}>
-          <Text style={styles.statTileLabel}>BW MAX</Text>
-          <Text style={[styles.statTileValue, mono]}>{store.state.bwLastTestReps} reps</Text>
         </View>
       </View>
 
@@ -242,15 +203,6 @@ const styles = StyleSheet.create({
   mottoRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -6 },
   mottoText: { color: theme.textFaint, fontSize: 12.5, fontWeight: '500', letterSpacing: 0.1 },
   dateLabel: { color: theme.textFaint, fontSize: 13, fontWeight: '500' },
-  cycleChip: {
-    backgroundColor: theme.cardMuted,
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  cycleChipText: { color: theme.textDim, fontSize: 11, fontWeight: '600', letterSpacing: 0.6 },
   card: {
     backgroundColor: theme.card,
     borderWidth: 1,
@@ -268,7 +220,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   whyPillText: { color: theme.textDim, fontSize: 12, fontWeight: '600' },
-  sessionTitle: { fontSize: 23, fontWeight: '700', letterSpacing: -0.3, color: theme.text, marginTop: 6 },
   statRow3: { flexDirection: 'row', gap: 24, marginTop: 16 },
   statBig: { fontSize: 25, fontWeight: '600', color: theme.text },
   statCaption: { fontSize: 11, color: theme.textFaint, marginTop: 2 },

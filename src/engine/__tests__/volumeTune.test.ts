@@ -4,6 +4,7 @@ import { applyResult, replayAll } from '../stateMachine';
 import { buildWhy, explainDetail, explainShort } from '../explain';
 import * as C from '../constants';
 import { LoggedSession, Profile, ProgramState, SetLog, VolumeTune } from '../types';
+import { PULL_VARIATIONS } from '../pullVariations';
 
 const profile: Profile = {
   bodyweightKg: 82,
@@ -185,17 +186,21 @@ describe('generator reads the tune', () => {
     const plan = generateSession(profile, volState, '2026-07-26');
     expect(plan.dayKind).toBe('volume');
     const working = plan.sets.filter((s) => !s.isWarmup);
-    expect(working[0].targetReps).toBe(9); // ceil(19*.5)=10, -1
+    // tuned base is ceil(19×.5) − 1 = 9, then scaled by each block's grip
+    const scale = PULL_VARIATIONS.find((v) => v.key === working[0].variation!.key)!.scale;
+    expect(working[0].targetReps).toBe(Math.max(2, Math.round(9 * scale)));
     expect(working[0].restSecAfter).toBe(75);
     expect(plan.decisions[0].code).toBe('VOLUME_ADAPTED');
     expect(plan.decisions[0].params.direction).toBe('easier');
     expect(plan.why).toContain('84');
   });
 
-  it('untuned state is identical to the pre-feature output', () => {
+  it('an untuned day headlines the grip blocks, not an adaptation', () => {
     const state = { ...initialState(profile), week: 1 as const, sessionInWeek: 2 as const };
     const plan = generateSession(profile, state, '2026-07-26');
-    expect(plan.decisions[0].code).toBe('SUBMAX_DERIVED');
+    expect(plan.decisions[0].code).toBe('VARIATION_BLOCKS');
+    expect(plan.decisions.map((d) => d.code)).toContain('SUBMAX_DERIVED');
+    expect(plan.decisions.map((d) => d.code)).not.toContain('VOLUME_ADAPTED');
     expect(plan.sets.filter((s) => !s.isWarmup)[0].restSecAfter).toBe(60);
   });
 

@@ -560,20 +560,30 @@ export interface PushMasteryTier {
   items: Array<{ variation: PushVariation; reps: number }>;
 }
 
-export function pushMasteryPath(sessions: LoggedSession[]): PushMasteryTier[] {
+/** Shared by both movement libraries — tiers open on cumulative earlier work. */
+export function masteryPath(
+  sessions: LoggedSession[],
+  tiers: Array<{ title: string; keys: string[] }>,
+  thresholds: number[],
+  library: PushVariation[]
+): PushMasteryTier[] {
   const totals = pushVariationTotals(sessions);
-  const tierReps = PUSH_TIERS.map((t) => t.keys.reduce((sum, k) => sum + (totals[k] ?? 0), 0));
-  return PUSH_TIERS.map((tier, i) => {
+  const tierReps = tiers.map((t) => t.keys.reduce((sum, k) => sum + (totals[k] ?? 0), 0));
+  return tiers.map((tier, i) => {
     const earlier = tierReps.slice(0, i).reduce((sum, r) => sum + r, 0);
     return {
       title: tier.title,
-      open: earlier >= PUSH_TIER_THRESHOLDS[i],
+      open: earlier >= (thresholds[i] ?? 0),
       items: tier.keys.map((k) => ({
-        variation: PUSH_VARIATIONS.find((v) => v.key === k)!,
+        variation: library.find((v) => v.key === k)!,
         reps: totals[k] ?? 0,
       })),
     };
   });
+}
+
+export function pushMasteryPath(sessions: LoggedSession[]): PushMasteryTier[] {
+  return masteryPath(sessions, PUSH_TIERS, PUSH_TIER_THRESHOLDS, PUSH_VARIATIONS);
 }
 
 export const PUSH_MILESTONES = [40, 50, 60, 80, 100];

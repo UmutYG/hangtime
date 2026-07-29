@@ -111,3 +111,13 @@ export function fmtScheduleDate(iso: ISODate, todayIso: ISODate): string {
     ...(sameYear ? {} : { year: 'numeric' }),
   });
 }
+
+/** "10×11" for a uniform day, "10 × 9–11" when grip blocks differ. */
+export function setsRepsLabel(sets: Array<{ targetReps: number; amrap?: boolean }>): string {
+  if (sets.length === 0) return '—';
+  const reps = sets.map((s) => s.targetReps);
+  const lo = Math.min(...reps);
+  const hi = Math.max(...reps);
+  const amrap = sets[0].amrap ? '+' : '';
+  return lo === hi ? `${sets.length}×${lo}${amrap}` : `${sets.length} × ${lo}–${hi}`;
+}

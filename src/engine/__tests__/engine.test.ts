@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generateSession, initialState, resolveDayKind } from '../generator';
 import { applyResult, replayAll } from '../stateMachine';
 import { computeGoals } from '../goals';
+import { PULL_VARIATIONS } from '../pullVariations';
 import { e1rmSystem, addedLoadForReps } from '../epley';
 import {
   LoggedSession,
@@ -246,8 +247,13 @@ describe('BW days recalibrate targets', () => {
       nextDate()
     );
     expect(volPlan.dayKind).toBe('volume');
-    expect(volPlan.sets[0].targetReps).toBe(Math.ceil(21 * 0.5));
     expect(volPlan.sets).toHaveLength(10);
+    // the standard-grip base is 50 % of the new max; each block scales from it
+    const base = Math.ceil(21 * 0.5);
+    for (const set of volPlan.sets) {
+      const scale = PULL_VARIATIONS.find((v) => v.key === set.variation!.key)!.scale;
+      expect(set.targetReps).toBe(Math.max(2, Math.round(base * scale)));
+    }
   });
 });
 
@@ -465,5 +471,66 @@ describe('goals', () => {
     expect(rep?.targetValue).toBe(20);
     const weighted = goals.find((g) => g.quality === 'weighted');
     expect(weighted?.label).toContain('+20 kg'); // 25 % of 80 kg
+  });
+});
+
+describe('a bad test day cannot crater the block', () => {
+  const testSession = (reps: number, state: ProgramState): LoggedSession => ({
+    id: `t-${reps}`,
+    date: '2026-08-21',
+    dayKind: 'testBw',
+    cycle: state.cycle,
+    week: 4,
+    sets: [
+      { targetReps: 3, actualReps: 3, loadKg: 0, isWarmup: true },
+      { targetReps: reps, actualReps: reps, loadKg: 0 },
+    ],
+  });
+
+  const withMax = (max: number): ProgramState => ({
+    ...initialState(profile),
+    bwBestMaxSet: max,
+    bwLastTestReps: max,
+  });
+
+  it('accepts an improvement in full', () => {
+    const state = withMax(19);
+    const out = applyResult(profile, state, testSession(23, state), []);
+    expect(out.state.bwLastTestReps).toBe(23);
+    expect(out.state.bwBestMaxSet).toBe(23);
+  });
+
+  it('accepts a believable decline as-is', () => {
+    const state = withMax(19);
+    const out = applyResult(profile, state, testSession(17, state), []);
+    expect(out.state.bwLastTestReps).toBe(17); // within the 15 % floor (16)
+  });
+
+  it('floors an implausible collapse instead of trusting it', () => {
+    const state = withMax(19);
+    const out = applyResult(profile, state, testSession(11, state), []);
+    expect(out.state.bwLastTestReps).toBe(16); // round(19 × 0.85)
+    expect(out.state.bwBestMaxSet).toBe(16);
+  });
+
+  it('still records what you actually did, so the chart stays honest', () => {
+    const state = withMax(19);
+    const out = applyResult(profile, state, testSession(11, state), []);
+    expect(out.newTests.map((t) => t.value)).toEqual([11]);
+  });
+
+  it('lets a real decline land over two tests', () => {
+    let state = withMax(19);
+    state = applyResult(profile, state, testSession(11, state), []).state;
+    expect(state.bwLastTestReps).toBe(16);
+    state = { ...state, week: 4, sessionInWeek: 3 };
+    state = applyResult(profile, state, testSession(11, state), []).state;
+    expect(state.bwLastTestReps).toBe(14); // round(16 × 0.85) — converging on the truth
+  });
+
+  it('does not cap the very first test', () => {
+    const fresh = { ...initialState(profile), bwLastTestReps: 0, bwBestMaxSet: 0 };
+    const out = applyResult(profile, fresh, testSession(12, fresh), []);
+    expect(out.state.bwLastTestReps).toBe(12);
   });
 });
