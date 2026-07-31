@@ -12,8 +12,11 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.umutyg.hangtime",
-      "buildNumber": "18",
-      "supportsTablet": false
+      "buildNumber": "19",
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
