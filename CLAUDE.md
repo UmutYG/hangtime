@@ -17,6 +17,7 @@ Visible brand name lives in exactly three places: `BRAND` in `src/theme.ts`, `na
 - **Simulator builds must be Release**, not Debug: the prebuilt RN-core debug tarball is missing Fabric symbols and Debug sim builds fail to link (the "SwiftUICore not an allowed client" error is a red herring). Use `npx expo run:ios --configuration Release --device <udid>` with `LANG=en_US.UTF-8` exported. If `expo run:ios` errors after a successful build (osascript step), launch the built .app from DerivedData directly via the simulator tool's `launch`.
 - Simulator tap coordinates are in POINTS (402×874 on iPhone 17), not screenshot pixels.
 - Engine changes must also pass `npx vitest run` and `npx tsc --noEmit`.
+- **Add expo packages with `npx expo install <pkg>`, never `npm install`** — npm resolves to `latest`, which for an expo-* package means a build for a different SDK. It links and archives fine, then white-screens on launch with no error. `npx expo install --check` lists any package that has drifted.
 
 # Publishing workflow
 
