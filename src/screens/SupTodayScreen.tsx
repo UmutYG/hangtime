@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { MECH_INFO, nowWindow, supDayFor } from '../engine/supplements';
-import type { SupplementItem } from '../engine/types';
+import { nextStatus, nowWindow, statusOf, supDayFor } from '../engine/supplements';
+import type { SupplementItem, SupplementStatus } from '../engine/types';
 import { useStore } from '../hooks/useStore';
 import { MECH_COLOR, mono, modeIdentity, theme, type } from '../theme';
 import { RoofBar } from '../components/RoofBar';
 import { ModeMark } from '../components/ModeMark';
 import { Sheet } from '../components/Sheet';
+import { SupplementFlash } from '../components/SupplementFlash';
+import { syncSupplementReminders } from '../lib/supplementNotifications';
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -16,85 +18,126 @@ function todayLabel(): string {
 }
 
 export function SupTodayScreen() {
-  const { store, toggleSupplement } = useStore();
+  const { store, setSupplementStatus } = useStore();
   const [viewing, setViewing] = useState<SupplementItem | null>(null);
+  const [flash, setFlash] = useState<SupplementItem | null>(null);
+
+  // Entering this room is the one place it's fair to ask for notification
+  // permission — the reminders belong to what's on this screen. Everywhere
+  // else the schedule syncs silently, only if permission already exists.
+  useEffect(() => {
+    void syncSupplementReminders(store.supItems ?? [], store.supDays ?? [], { ask: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const items = (store.supItems ?? []).filter((i) => i.active).sort((a, b) => a.order - b.order);
   const day = supDayFor(store.supDays ?? [], todayIso());
-  const takenCount = items.filter((i) => day.taken[i.id]).length;
+  const takenCount = items.filter((i) => statusOf(day, i.id) === 'taken').length;
+  const skippedCount = items.filter((i) => statusOf(day, i.id) === 'skipped').length;
+  const answered = takenCount + skippedCount;
   const now = new Date();
   const nowLine = nowWindow(now.getHours() + now.getMinutes() / 60);
 
-  const viewingStamp = viewing ? day.taken[viewing.id] : undefined;
+  const viewingStatus = viewing ? statusOf(day, viewing.id) : null;
+  const viewingStamp = viewing
+    ? (day.taken[viewing.id] ?? day.skipped?.[viewing.id])
+    : undefined;
+
+  // Logging a dose is the one moment worth saying something: the flash shows
+  // what it's doing in the body. Skipping and undoing pass quietly.
+  const record = (item: SupplementItem, status: SupplementStatus | null) => {
+    setSupplementStatus(item.id, status);
+    if (status === 'taken' && item.doing) setFlash(item);
+  };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <RoofBar />
-      <View>
-        <Text style={styles.dateLabel}>{todayLabel()}</Text>
-        <Text style={type.hero}>Today</Text>
-      </View>
-      <View style={styles.mottoRow}>
-        <ModeMark mode="supplements" size={15} color={theme.supp} />
-        <Text style={styles.mottoText}>{modeIdentity('supplements').motto}</Text>
-      </View>
-
-      <View style={styles.nowCard}>
-        <Text style={styles.nowLabel}>RIGHT NOW</Text>
-        <Text style={styles.nowState}>{nowLine.state}</Text>
-        <Text style={styles.nowWhy}>{nowLine.why}</Text>
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.listHeader}>
-          <Text style={[type.kickerDim, { color: theme.supp }]}>TODAY</Text>
-          <Text style={[styles.countText, mono]}>
-            {takenCount} of {items.length} logged
-          </Text>
+    <View style={{ flex: 1 }}>
+      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+        <RoofBar />
+        <View>
+          <Text style={styles.dateLabel}>{todayLabel()}</Text>
+          <Text style={type.hero}>Today</Text>
         </View>
-        {items.map((it, idx) => {
-          const stamp = day.taken[it.id];
-          const color = MECH_COLOR[it.mech];
-          return (
-            <View key={it.id} style={[styles.row, idx === items.length - 1 && styles.rowLast]}>
-              <Pressable
-                onPress={() => toggleSupplement(it.id)}
-                hitSlop={8}
-                style={[
-                  styles.tick,
-                  { borderColor: stamp ? color : theme.borderStrong },
-                  stamp ? { backgroundColor: color } : null,
-                ]}
-              >
-                {stamp ? <Text style={styles.tickMark}>✓</Text> : null}
-              </Pressable>
-              <Pressable style={styles.rowBody} onPress={() => setViewing(it)}>
-                <Text style={[styles.rowName, stamp ? styles.rowNameDone : null]}>{it.name}</Text>
-                <View style={styles.rowMeta}>
-                  {stamp ? (
-                    <Text style={[styles.stamp, mono]}>{stamp}</Text>
-                  ) : (
-                    <Text style={styles.slot}>{it.slot}</Text>
-                  )}
-                  <View style={[styles.tag, { backgroundColor: `${color}22` }]}>
-                    <Text style={[styles.tagText, { color }]}>{MECH_INFO[it.mech].tag}</Text>
-                  </View>
-                </View>
-              </Pressable>
-              <Text style={styles.chev}>›</Text>
-            </View>
-          );
-        })}
-        {items.length === 0 ? (
-          <Text style={styles.emptyText}>
-            Nothing in the stack. Add what you take under the Stack tab.
-          </Text>
-        ) : null}
-      </View>
+        <View style={styles.mottoRow}>
+          <ModeMark mode="supplements" size={15} color={theme.supp} />
+          <Text style={styles.mottoText}>{modeIdentity('supplements').motto}</Text>
+        </View>
 
-      <Text style={styles.footNote}>
-        No streaks by design. Logged days are context for reading your body, not a score to protect.
-      </Text>
+        <View style={styles.nowCard}>
+          <Text style={styles.nowLabel}>RIGHT NOW</Text>
+          <Text style={styles.nowState}>{nowLine.state}</Text>
+          <Text style={styles.nowWhy}>{nowLine.why}</Text>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.listHeader}>
+            <Text style={[type.kickerDim, { color: theme.supp }]}>TODAY</Text>
+            <Text style={[styles.countText, mono]}>
+              {takenCount} of {items.length} taken
+              {skippedCount > 0 ? ` · ${skippedCount} skipped` : ''}
+            </Text>
+          </View>
+          {items.map((it, idx) => {
+            const status = statusOf(day, it.id);
+            const stamp = day.taken[it.id] ?? day.skipped?.[it.id];
+            const color = MECH_COLOR[it.mech];
+            return (
+              <View key={it.id} style={[styles.row, idx === items.length - 1 && styles.rowLast]}>
+                <Pressable
+                  onPress={() => record(it, nextStatus(status))}
+                  hitSlop={8}
+                  style={[
+                    styles.tick,
+                    { borderColor: status ? color : theme.borderStrong },
+                    status === 'taken' ? { backgroundColor: color } : null,
+                  ]}
+                >
+                  {status === 'taken' ? <Text style={styles.tickMark}>✓</Text> : null}
+                  {status === 'skipped' ? (
+                    <View style={[styles.skipBar, { backgroundColor: color }]} />
+                  ) : null}
+                </Pressable>
+                <Pressable style={styles.rowBody} onPress={() => setViewing(it)}>
+                  <Text style={[styles.rowName, status ? styles.rowNameDone : null]}>{it.name}</Text>
+                  <View style={styles.rowMeta}>
+                    {status === 'taken' ? (
+                      <Text style={[styles.stamp, mono]}>{stamp}</Text>
+                    ) : status === 'skipped' ? (
+                      <Text style={styles.skippedText}>skipped today</Text>
+                    ) : (
+                      <Text style={styles.slot}>{it.slot}</Text>
+                    )}
+                  </View>
+                </Pressable>
+                <Text style={styles.chev}>›</Text>
+              </View>
+            );
+          })}
+          {items.length === 0 ? (
+            <Text style={styles.emptyText}>
+              Nothing in the stack. Add what you take under the Stack tab.
+            </Text>
+          ) : null}
+        </View>
+
+        {items.length > 0 && answered === items.length ? (
+          <Text style={styles.doneNote}>Every one answered today.</Text>
+        ) : (
+          <Text style={styles.footNote}>
+            Tap the circle once for taken, twice to mark it skipped. No streaks — logged days are
+            context for reading your body, not a score to protect.
+          </Text>
+        )}
+      </ScrollView>
+
+      {flash ? (
+        <SupplementFlash
+          name={flash.name}
+          doing={flash.doing ?? ''}
+          accent={MECH_COLOR[flash.mech]}
+          onDone={() => setFlash(null)}
+        />
+      ) : null}
 
       {viewing ? (
         <Sheet
@@ -103,17 +146,14 @@ export function SupTodayScreen() {
           title={viewing.name}
           subtitle={viewing.slot}
         >
-          <View style={styles.sheetTagRow}>
-            <View style={[styles.tag, { backgroundColor: `${MECH_COLOR[viewing.mech]}22` }]}>
-              <Text style={[styles.tagText, { color: MECH_COLOR[viewing.mech] }]}>
-                {MECH_INFO[viewing.mech].tag}
-              </Text>
-            </View>
-          </View>
-          {viewingStamp && viewing.doing ? (
+          {viewingStatus && viewing.doing ? (
             <View style={[styles.doingCard, { borderLeftColor: MECH_COLOR[viewing.mech] }]}>
-              <Text style={styles.doingText}>{viewing.doing}</Text>
-              <Text style={[styles.doingStamp, mono]}>logged {viewingStamp}</Text>
+              <Text style={styles.doingText}>
+                {viewingStatus === 'taken' ? viewing.doing : 'Skipped today — no judgement, it just means today has no dose to read.'}
+              </Text>
+              <Text style={[styles.doingStamp, mono]}>
+                {viewingStatus === 'taken' ? 'logged' : 'skipped'} {viewingStamp}
+              </Text>
             </View>
           ) : null}
           {viewing.why ? (
@@ -128,20 +168,44 @@ export function SupTodayScreen() {
               <Text style={styles.sheetBody}>{viewing.notice}</Text>
             </>
           ) : null}
-          <Pressable
-            onPress={() => {
-              toggleSupplement(viewing.id);
-              setViewing(null);
-            }}
-            style={[styles.sheetBtn, viewingStamp ? styles.sheetBtnUndo : null]}
-          >
-            <Text style={[styles.sheetBtnText, viewingStamp ? styles.sheetBtnUndoText : null]}>
-              {viewingStamp ? 'Undo this log' : 'Log it'}
-            </Text>
-          </Pressable>
+
+          {viewingStatus === null ? (
+            <>
+              <Pressable
+                onPress={() => {
+                  record(viewing, 'taken');
+                  setViewing(null);
+                }}
+                style={styles.sheetBtn}
+              >
+                <Text style={styles.sheetBtnText}>Log it</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  record(viewing, 'skipped');
+                  setViewing(null);
+                }}
+                style={[styles.sheetBtn, styles.sheetBtnGhost]}
+              >
+                <Text style={[styles.sheetBtnText, styles.sheetBtnGhostText]}>Skip today</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Pressable
+              onPress={() => {
+                record(viewing, null);
+                setViewing(null);
+              }}
+              style={[styles.sheetBtn, styles.sheetBtnGhost]}
+            >
+              <Text style={[styles.sheetBtnText, styles.sheetBtnGhostText]}>
+                Clear {viewingStatus === 'taken' ? 'this log' : 'the skip'}
+              </Text>
+            </Pressable>
+          )}
         </Sheet>
       ) : null}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -193,14 +257,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tickMark: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  skipBar: { width: 11, height: 2, borderRadius: 1 },
   rowBody: { flex: 1, gap: 3 },
   rowName: { fontSize: 15, fontWeight: '600', color: theme.text },
   rowNameDone: { opacity: 0.45, textDecorationLine: 'line-through' },
   rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 7, flexWrap: 'wrap' },
   slot: { fontSize: 11.5, color: theme.textFaint },
   stamp: { fontSize: 11, color: theme.textFaint },
-  tag: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1.5 },
-  tagText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  skippedText: { fontSize: 11.5, color: theme.textFaint, fontStyle: 'italic' },
   chev: { color: theme.textFaint, fontSize: 17, opacity: 0.6 },
   emptyText: { color: theme.textFaint, fontSize: 13, paddingVertical: 12 },
   footNote: {
@@ -210,7 +274,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 10,
   },
-  sheetTagRow: { flexDirection: 'row', marginTop: 6 },
+  doneNote: {
+    color: theme.supp,
+    fontSize: 12.5,
+    fontWeight: '600',
+    textAlign: 'center',
+    paddingHorizontal: 10,
+  },
   doingCard: {
     backgroundColor: theme.cardMuted,
     borderLeftWidth: 2.5,
@@ -231,13 +301,13 @@ const styles = StyleSheet.create({
   },
   sheetBody: { fontSize: 14, lineHeight: 21, color: theme.text },
   sheetBtn: {
-    marginTop: 22,
+    marginTop: 14,
     backgroundColor: theme.dark,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
   },
   sheetBtnText: { color: theme.onDark, fontSize: 14.5, fontWeight: '700' },
-  sheetBtnUndo: { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.borderStrong },
-  sheetBtnUndoText: { color: theme.textDim },
+  sheetBtnGhost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.borderStrong },
+  sheetBtnGhostText: { color: theme.textDim },
 });

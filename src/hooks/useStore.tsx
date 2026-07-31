@@ -9,8 +9,15 @@ import React, {
 import { AppState } from 'react-native';
 import { applyResult, replayAll } from '../engine/stateMachine';
 import { applyPushResult, initialPushState, replayPushAll } from '../engine/pushups';
-import { JointFeel, LoggedSession, Profile, Store, SupplementItem } from '../engine/types';
-import { toggleTaken } from '../engine/supplements';
+import {
+  JointFeel,
+  LoggedSession,
+  Profile,
+  Store,
+  SupplementItem,
+  SupplementStatus,
+} from '../engine/types';
+import { setStatus } from '../engine/supplements';
 import { mergeRuns, Run } from '../engine/runs';
 import { initialState } from '../engine/generator';
 import { emptyStore, importJson, loadStore, saveStore, stamp } from '../lib/storage';
@@ -23,6 +30,7 @@ import {
   SyncState,
 } from '../lib/cloudSync';
 import { applySnapshot, buildSnapshot } from '../lib/roofBackup';
+import { syncSupplementReminders } from '../lib/supplementNotifications';
 import { mergeStores, storeDiffers } from '../engine/merge';
 import { fetchRunsFromHealth, isHealthModuleAvailable, requestHealthAuth } from '../lib/health';
 
@@ -52,8 +60,8 @@ interface StoreApi {
   deletePushSession: (id: string) => void;
   restorePushSession: (id: string) => void;
   emptyPushTrash: () => void;
-  /** tick/untick a supplement for today, stamping the local time */
-  toggleSupplement: (itemId: string) => void;
+  /** record a supplement as taken or skipped today, or clear it with null */
+  setSupplementStatus: (itemId: string, status: SupplementStatus | null) => void;
   /** add a new item or save edits to an existing one (matched by id) */
   saveSupItem: (item: SupplementItem) => void;
   /** archive keeps history attached; restore brings it back to the daily list */
@@ -331,11 +339,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     update((s) => ({ ...s, pushTrash: [] }));
   }, [update]);
 
-  const toggleSupplement = useCallback(
-    (itemId: string) => {
+  // Keep supplement reminders in step with the stack and today's log: on
+  // launch, and whenever either changes. Cheap — it cancels only its own and
+  // re-derives the next few days.
+  useEffect(() => {
+    if (!ready) return;
+    void syncSupplementReminders(store.supItems ?? [], store.supDays ?? []);
+  }, [ready, store.supItems, store.supDays]);
+
+  const setSupplementStatus = useCallback(
+    (itemId: string, status: SupplementStatus | null) => {
       const today = new Date().toISOString().slice(0, 10);
       const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      update((s) => ({ ...s, supDays: toggleTaken(s.supDays ?? [], today, itemId, time) }));
+      update((s) => ({
+        ...s,
+        supDays: setStatus(s.supDays ?? [], today, itemId, status, time),
+      }));
     },
     [update]
   );
@@ -524,7 +543,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         deletePushSession,
         restorePushSession,
         emptyPushTrash,
-        toggleSupplement,
+        setSupplementStatus,
         saveSupItem,
         setSupItemActive,
         importStore,

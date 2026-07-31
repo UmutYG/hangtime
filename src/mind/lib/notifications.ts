@@ -403,10 +403,19 @@ async function scheduleDailyRemindersNow(lang: Lang, apiKey: string): Promise<vo
   // With its old fixed 75-second delay a resurface practically never
   // overlapped a reschedule; now that it can sit up to ~45 minutes out, a
   // quick background/foreground would silently eat it.
+  //
+  // Inside Roof this must also leave OTHER rooms alone: supplements schedule
+  // their own reminders, and a blanket cancel here would quietly delete them
+  // on every foreground. Untagged notifications are this module's own from
+  // before rooms existed, so those still go.
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
     scheduled
-      .filter((n) => (n.content?.data as any)?.kind !== "resurface")
+      .filter((n) => {
+        const data = (n.content?.data ?? {}) as { kind?: string; room?: string };
+        if (data.kind === "resurface") return false;
+        return data.room === undefined || data.room === "mind";
+      })
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier))
   );
   const lines = await getHeartfeltLines(lang, apiKey);
@@ -426,7 +435,7 @@ async function scheduleDailyRemindersNow(lang: Lang, apiKey: string): Promise<vo
           ? momentLine(pack.echo, echoLine, lang, yesterdaysSample, key, "echo")
           : lines[dateIndex(key, lines.length, "am")];
       await Notifications.scheduleNotificationAsync({
-        content: { title: APP_TITLE, body },
+        content: { title: APP_TITLE, body, data: { room: "mind" } },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: morning },
       });
     }
@@ -450,7 +459,7 @@ async function scheduleDailyRemindersNow(lang: Lang, apiKey: string): Promise<vo
         body = lines[dateIndex(key, lines.length, "pm")];
       }
       await Notifications.scheduleNotificationAsync({
-        content: { title: APP_TITLE, body },
+        content: { title: APP_TITLE, body, data: { room: "mind" } },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: midday },
       });
     }
@@ -466,6 +475,7 @@ async function scheduleDailyRemindersNow(lang: Lang, apiKey: string): Promise<vo
           title: APP_TITLE,
           body,
           categoryIdentifier: LOG_CATEGORY,
+          data: { room: "mind" },
         },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: evening },
       });
@@ -553,7 +563,7 @@ export async function scheduleResurface(
     : RESURFACE_LINES[lang][Math.floor(Math.random() * RESURFACE_LINES[lang].length)](short);
   await Notifications.scheduleNotificationAsync({
     // `kind` marks this so the daily rescheduler's cleanup spares it.
-    content: { title: APP_TITLE, body, data: { kind: "resurface" } },
+    content: { title: APP_TITLE, body, data: { kind: "resurface", room: "mind" } },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds: resurfaceDelaySeconds(),

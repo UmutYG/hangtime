@@ -7,10 +7,14 @@ import {
   kindCard,
   MECH_INFO,
   newSupplementId,
+  nextStatus,
   nowWindow,
+  reminderBody,
+  reminderGroups,
+  setStatus,
+  statusOf,
   stripData,
   supDayFor,
-  toggleTaken,
 } from '../supplements';
 import type { SupplementDay, SupplementItem } from '../types';
 
@@ -49,21 +53,97 @@ describe('default stack', () => {
   });
 });
 
-describe('toggleTaken', () => {
-  it('logs and unlogs, dropping empty days', () => {
+describe('setStatus', () => {
+  it('logs and clears, dropping empty days', () => {
     let days: SupplementDay[] = [];
-    days = toggleTaken(days, TODAY, 'creatine', '19:12');
+    days = setStatus(days, TODAY, 'creatine', 'taken', '19:12');
     expect(supDayFor(days, TODAY).taken.creatine).toBe('19:12');
-    days = toggleTaken(days, TODAY, 'creatine', '19:15');
+    days = setStatus(days, TODAY, 'creatine', null, '19:15');
     expect(days).toHaveLength(0); // day removed when nothing is left
   });
 
   it('keeps other items on the same day intact', () => {
     let days: SupplementDay[] = [];
-    days = toggleTaken(days, TODAY, 'omega', '13:00');
-    days = toggleTaken(days, TODAY, 'zinc', '13:01');
-    days = toggleTaken(days, TODAY, 'omega', '13:05');
+    days = setStatus(days, TODAY, 'omega', 'taken', '13:00');
+    days = setStatus(days, TODAY, 'zinc', 'taken', '13:01');
+    days = setStatus(days, TODAY, 'omega', null, '13:05');
     expect(supDayFor(days, TODAY).taken).toEqual({ zinc: '13:01' });
+  });
+
+  it('moves an item between taken and skipped without leaving both set', () => {
+    let days: SupplementDay[] = [];
+    days = setStatus(days, TODAY, 'zinc', 'taken', '12:30');
+    days = setStatus(days, TODAY, 'zinc', 'skipped', '12:31');
+    const day = supDayFor(days, TODAY);
+    expect(day.taken.zinc).toBeUndefined();
+    expect(day.skipped?.zinc).toBe('12:31');
+    expect(statusOf(day, 'zinc')).toBe('skipped');
+  });
+
+  it('keeps a day alive when only skips remain, and drops it when they clear', () => {
+    let days = setStatus([], TODAY, 'zinc', 'skipped', '12:30');
+    expect(days).toHaveLength(1);
+    days = setStatus(days, TODAY, 'zinc', null, '12:31');
+    expect(days).toHaveLength(0);
+  });
+
+  it('never counts a skip as a dose', () => {
+    const days = setStatus([], TODAY, 'creatine', 'skipped', '19:00');
+    expect(countDays(days, 'creatine', 28, TODAY)).toBe(0);
+  });
+
+  it('cycles nothing → taken → skipped → nothing', () => {
+    expect(nextStatus(null)).toBe('taken');
+    expect(nextStatus('taken')).toBe('skipped');
+    expect(nextStatus('skipped')).toBeNull();
+  });
+});
+
+describe('reminders', () => {
+  const item = (id: string, order: number, remindAt?: string, active = true): SupplementItem => ({
+    id,
+    name: id,
+    slot: '',
+    mech: 'food',
+    active,
+    order,
+    remindAt,
+  });
+
+  it('bundles items that share a minute, in day order', () => {
+    const groups = reminderGroups([
+      item('c', 2, '12:30'),
+      item('a', 0, '06:00'),
+      item('b', 1, '12:30'),
+    ]);
+    expect(groups.map((g) => g.at)).toEqual(['06:00', '12:30']);
+    expect(groups[1].items.map((i) => i.id)).toEqual(['b', 'c']);
+  });
+
+  it('ignores archived items, missing times and malformed times', () => {
+    const groups = reminderGroups([
+      item('archived', 0, '08:00', false),
+      item('none', 1, undefined),
+      item('bad', 2, '8am'),
+    ]);
+    expect(groups).toHaveLength(0);
+  });
+
+  it('names what to take without any mechanism jargon', () => {
+    const g = { at: '12:30', items: [item('Omega-3', 0), item('D3', 1), item('Zinc', 2)] };
+    expect(reminderBody(g)).toBe('Omega-3, D3 and Zinc');
+    expect(reminderBody({ at: '', items: [item('Creatine', 0)] })).toBe('Creatine');
+  });
+});
+
+describe('default stack reminders', () => {
+  it('ships every seeded item with a time, grouped into a handful of moments', () => {
+    const stack = defaultStack();
+    expect(stack.every((i) => !!i.remindAt)).toBe(true);
+    const groups = reminderGroups(stack);
+    // 06:00, 06:25, 12:30, 19:00, 22:00 — five moments, not eight pings
+    expect(groups).toHaveLength(5);
+    expect(groups.find((g) => g.at === '12:30')?.items).toHaveLength(3);
   });
 });
 

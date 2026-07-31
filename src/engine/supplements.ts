@@ -2,7 +2,14 @@
 // The organizing idea: every supplement is governed by one of five absorption
 // mechanisms, and its place in the day follows from that mechanism, not from habit.
 
-import type { ISODate, SupplementDay, SupplementItem, SupplementKind, SupplementMech } from './types';
+import type {
+  ISODate,
+  SupplementDay,
+  SupplementItem,
+  SupplementKind,
+  SupplementMech,
+  SupplementStatus,
+} from './types';
 
 export const MECH_INFO: Record<SupplementMech, { tag: string; name: string; blurb: string }> = {
   fat: {
@@ -54,6 +61,7 @@ export function defaultStack(): SupplementItem[] {
         'Malate feeds the citric-acid cycle, so expect steady output rather than a lift — if you feel a kick, that\'s the espresso. The one signal worth acting on is loose stools, which points at the citrate fraction rather than magnesium itself.',
       active: true,
       order: 0,
+      remindAt: '06:00',
     },
     {
       id: 'coconut_am',
@@ -67,6 +75,7 @@ export function defaultStack(): SupplementItem[] {
         'Steady satiety across the walk rather than a sharp cognitive shift. About half of coconut oil is lauric acid, which behaves like a long-chain fat; only 13–15% is the C8/C10 fraction behind the brain claims. Good fat either way.',
       active: true,
       order: 1,
+      remindAt: '06:25',
     },
     {
       id: 'omega',
@@ -81,6 +90,7 @@ export function defaultStack(): SupplementItem[] {
         'Fishy burps mean the oil has oxidised — a freshness signal, not sensitivity. Everything else is cumulative over months and won\'t be felt; HDL was 49 against an optimal above 60, so that\'s the readout on your next panel.',
       active: true,
       order: 2,
+      remindAt: '12:30',
     },
     {
       id: 'd3k2',
@@ -95,6 +105,7 @@ export function defaultStack(): SupplementItem[] {
         'This is the item where the number matters more than the feeling. 111 ng/mL against a 30–100 reference, on a combined intake near 8,000 IU/day against a widely cited 4,000 ceiling. Retest 25-OH D and let that set the dose.',
       active: true,
       order: 3,
+      remindAt: '12:30',
     },
     {
       id: 'zinc',
@@ -109,6 +120,7 @@ export function defaultStack(): SupplementItem[] {
         'Nothing acute, and that\'s expected. 109 µg/dL in a 70–120 range means you aren\'t deficient, so the honest rationale is replacing sweat and turnover losses as volume climbs — not raising testosterone, which only responds when a deficiency is corrected.',
       active: true,
       order: 4,
+      remindAt: '12:30',
     },
     {
       id: 'creatine',
@@ -123,6 +135,7 @@ export function defaultStack(): SupplementItem[] {
         'Two to four weeks to saturate, with about a kilo of early scale weight that is intracellular water, not fat. On future bloodwork, serum creatinine drifting to 1.0–1.3 is benign turnover, not kidney strain — eGFR above 90 is the check, and yours is 117.',
       active: true,
       order: 5,
+      remindAt: '19:00',
     },
     {
       id: 'coconut_pm',
@@ -135,6 +148,7 @@ export function defaultStack(): SupplementItem[] {
       notice: 'Nothing to track beyond it counting as part of your daily fat.',
       active: true,
       order: 6,
+      remindAt: '19:00',
     },
     {
       id: 'mag_pm',
@@ -149,6 +163,7 @@ export function defaultStack(): SupplementItem[] {
         'How fast you fall asleep and how often you surface, judged over one to two weeks rather than one night. Bisglycinate is the gentlest form on the gut, so if the morning capsule troubles you and this one doesn\'t, you\'ve isolated the citrate fraction.',
       active: true,
       order: 7,
+      remindAt: '22:00',
     },
   ];
 }
@@ -159,20 +174,48 @@ export function supDayFor(days: SupplementDay[], date: ISODate): SupplementDay {
   return days.find((d) => d.date === date) ?? { date, taken: {} };
 }
 
-/** toggle an item for a date; returns the new days array (day removed when it empties) */
-export function toggleTaken(
+/** what was recorded for this item today, if anything */
+export function statusOf(day: SupplementDay, itemId: string): SupplementStatus | null {
+  if (day.taken[itemId]) return 'taken';
+  if (day.skipped?.[itemId]) return 'skipped';
+  return null;
+}
+
+/**
+ * Record a status for an item on a date, or clear it with `null`.
+ *
+ * Skipped is stored separately from taken and never counted as a dose — the
+ * point is to tell "I decided not to" apart from "I haven't got to it", which
+ * a single tick can't express.
+ */
+export function setStatus(
   days: SupplementDay[],
   date: ISODate,
   itemId: string,
+  status: SupplementStatus | null,
   timeStr: string
 ): SupplementDay[] {
   const day = supDayFor(days, date);
   const taken = { ...day.taken };
-  if (taken[itemId]) delete taken[itemId];
-  else taken[itemId] = timeStr;
+  const skipped = { ...(day.skipped ?? {}) };
+  delete taken[itemId];
+  delete skipped[itemId];
+  if (status === 'taken') taken[itemId] = timeStr;
+  if (status === 'skipped') skipped[itemId] = timeStr;
+
   const rest = days.filter((d) => d.date !== date);
-  if (Object.keys(taken).length === 0) return rest;
-  return [...rest, { date, taken }].sort((a, b) => a.date.localeCompare(b.date));
+  const empty = Object.keys(taken).length === 0 && Object.keys(skipped).length === 0;
+  if (empty) return rest;
+  const next: SupplementDay = { date, taken };
+  if (Object.keys(skipped).length > 0) next.skipped = skipped;
+  return [...rest, next].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** tap-through order for the row circle: nothing → taken → skipped → nothing */
+export function nextStatus(current: SupplementStatus | null): SupplementStatus | null {
+  if (current === null) return 'taken';
+  if (current === 'taken') return 'skipped';
+  return null;
 }
 
 /** days on which the item was taken, optionally limited to the trailing window */
@@ -376,6 +419,42 @@ export function nowWindow(hourFloat: number): NowWindow {
   const h = Math.max(0, Math.min(23.999, hourFloat));
   const w = WINDOWS.find((x) => h >= x.s && h < x.e) ?? WINDOWS[0];
   return { state: w.state, why: w.why };
+}
+
+// ---------- reminders ----------
+
+export interface ReminderGroup {
+  /** "HH:MM" local */
+  at: string;
+  items: SupplementItem[];
+}
+
+/**
+ * Active items that want a reminder, bundled by the minute they share.
+ *
+ * Grouping is the whole point: three things belong to the first meal, and
+ * three separate pings for one glass of water is the kind of nagging that
+ * gets notifications turned off entirely.
+ */
+export function reminderGroups(items: SupplementItem[]): ReminderGroup[] {
+  const byTime = new Map<string, SupplementItem[]>();
+  for (const it of items) {
+    if (!it.active || !it.remindAt || !/^\d{2}:\d{2}$/.test(it.remindAt)) continue;
+    const list = byTime.get(it.remindAt) ?? [];
+    list.push(it);
+    byTime.set(it.remindAt, list);
+  }
+  return [...byTime.entries()]
+    .map(([at, list]) => ({ at, items: [...list].sort((a, b) => a.order - b.order) }))
+    .sort((a, b) => a.at.localeCompare(b.at));
+}
+
+/** what a grouped reminder should say — names, not mechanisms */
+export function reminderBody(group: ReminderGroup): string {
+  const names = group.items.map((i) => i.name);
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
 /** stable id for user-added items */

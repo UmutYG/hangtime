@@ -224,12 +224,20 @@ export interface SupplementItem {
   /** archived items keep their history but leave the daily list */
   active: boolean;
   order: number;
+  /** local time "HH:MM" for a daily reminder; absent = never remind */
+  remindAt?: string;
 }
+
+/** taken, deliberately skipped, or not answered yet */
+export type SupplementStatus = 'taken' | 'skipped';
 
 /** one calendar day of supplement logging: itemId → local time string ("14:05") */
 export interface SupplementDay {
   date: ISODate;
   taken: Record<string, string>;
+  /** deliberately skipped today — different from simply not logged, and
+   *  deliberately NOT counted as a dose anywhere */
+  skipped?: Record<string, string>;
 }
 
 export interface TestPoint {

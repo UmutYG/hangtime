@@ -26,7 +26,7 @@ Home stays one calm card per area. If a fifth room makes the map busier rather t
 Every prescription comes from published, outcome-proven methods (K Boges sub-max volume, One Hundred Push-ups, Pavel ladders, double progression, velocity-loss-derived fade thresholds, Foster session-RPE). Same inputs always produce the same session. `src/engine/` stays pure — no React Native imports, no `Date.now()` inside decisions, unit-tested.
 
 **Advise, never command.**
-Form cues are observations ("chin clears the bar"), never orders — enforced by a test that rejects "must", "should", and "!". Interrupted sessions are offered, not resumed. Readiness informs; it never blocks. Supplements are placed, never demanded. Mind mirrors; it never instructs.
+Form cues are observations ("chin clears the bar"), never orders — enforced by a test that rejects "must", "should", and "!". Interrupted sessions are offered, not resumed. Readiness informs; it never blocks. Supplements are placed, never demanded — and skipping one is a first-class answer the app records without comment, not a gap it nags about. Mind mirrors; it never instructs.
 
 **Measurement days stay honest.**
 Variations, autoregulation, and trims apply to volume and ladder days only. Max days and tests are always the standard movement at full prescription — otherwise the numbers driving the program start lying. `progressionExempt` means *not judged*.
@@ -53,7 +53,9 @@ Do not add, however well-intentioned:
 
 ## On notifications
 
-Roof is silent by default. The one exception is Mind, whose entire purpose is interrupting the habit of forgetting a good moment the second it happens — a mirror nobody looks into isn't a mirror. Those reminders belong to Mind alone, speak in its own warm voice, and never count, score, or scold. No other room may schedule anything.
+Roof is silent unless a room's purpose genuinely requires interrupting. Two do. **Mind** exists to break the habit of forgetting a good moment the second it happens — a mirror nobody looks into isn't a mirror. **Supplements** are taken at times, and a protocol you remember at midnight is a protocol you didn't follow.
+
+Nothing else may schedule anything, and the two that do obey the same rules: every notification is tagged with its room and a room may only ever cancel its own; reminders group by moment rather than firing per item; anything already answered — taken, skipped, logged — drops out of the rest of the day. They never count, score, or scold.
 
 ## The point
 

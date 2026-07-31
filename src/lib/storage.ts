@@ -77,7 +77,19 @@ export function migrate(raw: unknown): Store {
     };
   }
   // supplement module arrived after launch — existing stores get the seeded stack
-  if (!merged.supItems || merged.supItems.length === 0) merged.supItems = defaultStack();
+  if (!merged.supItems || merged.supItems.length === 0) {
+    merged.supItems = defaultStack();
+  } else {
+    // reminders arrived later still: give the seeded items their default time
+    // rather than making the user set eight of them by hand. Anything the user
+    // added, or already chose a time for, is left exactly as it is.
+    const seeded = new Map(defaultStack().map((i) => [i.id, i]));
+    merged.supItems = merged.supItems.map((i) =>
+      i.remindAt === undefined && seeded.has(i.id)
+        ? { ...i, remindAt: seeded.get(i.id)!.remindAt }
+        : i
+    );
+  }
   merged.supDays = merged.supDays ?? [];
   // a stored 'supplements' appMode is fine; anything unknown falls back
   if (!['pullups', 'pushups', 'running', 'supplements', 'mind'].includes(merged.appMode)) {

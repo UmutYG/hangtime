@@ -64,7 +64,10 @@ export function SupStackScreen() {
                 {it.name}
                 {!it.active ? '  · archived' : ''}
               </Text>
-              <Text style={styles.rowSlot}>{it.slot || MECH_INFO[it.mech].tag}</Text>
+              <Text style={styles.rowSlot}>
+                {it.slot || MECH_INFO[it.mech].tag}
+                {it.remindAt ? `  ·  reminds ${it.remindAt}` : ''}
+              </Text>
             </View>
             <Text style={styles.chev}>›</Text>
           </Pressable>
@@ -122,6 +125,23 @@ export function SupStackScreen() {
             placeholderTextColor={theme.textFaint}
             style={styles.input}
           />
+          <Text style={styles.fieldLabel}>REMIND ME AT</Text>
+          <TextInput
+            value={editing.remindAt ?? ''}
+            onChangeText={(v) =>
+              setEditing({ ...editing, remindAt: v.trim() === '' ? undefined : v.trim() })
+            }
+            placeholder="07:30 — leave empty for no reminder"
+            placeholderTextColor={theme.textFaint}
+            keyboardType="numbers-and-punctuation"
+            autoCorrect={false}
+            style={styles.input}
+          />
+          <Text style={styles.mechHint}>
+            Items sharing a time are reminded together, once. Anything already taken or skipped
+            drops out of the day's reminders.
+          </Text>
+
           <Text style={styles.fieldLabel}>MECHANISM</Text>
           <View style={styles.mechChips}>
             {MECHS.map((m) => {
