@@ -1,26 +1,41 @@
-# Hangtime — the lines that don't move
+# Roof — the lines that don't move
 
 Constraints, not a manifesto. If a change breaks one of these, it's the wrong change.
 
+## What Roof is
+
+A container for a life, not an app about a hobby. Home is a map of **life areas** — Body, Mind, Supplements today; whatever its owner actually lives tomorrow. Each area opens into a self-contained module with its own inner navigation, its own vocabulary, its own rules. A new need becomes a new room; it never becomes a feature bolted onto an existing one.
+
+The phone is a tool, not the point. Every room has to earn its place by mapping to something real outside the screen — and nothing else gets in.
+
 ## Hard constraints
 
-**The engine is deterministic. No LLM in the programming loop.**
-Every prescription comes from published, outcome-proven methods (K Boges sub-max volume, One Hundred Push-ups, Pavel ladders, double progression, velocity-loss-derived fade thresholds, Foster session-RPE). Same inputs always produce the same session. An AI guessing at sets and reps is the thing this app was built to avoid. `src/engine/` stays pure — no React Native imports, no `Date.now()` inside decisions, unit-tested.
+**No accounts, no backend.**
+Everything lives on the device; iCloud is the only safety net. Nothing here is worth a login screen or someone else's server.
+
+**Modules are sovereign.**
+A room owns its data, its storage keys, its screens, and its language. Body's readiness engine and Mind's mirror share nothing but the roof over them. Cross-module dashboards, unified scores, and "insights" blending unrelated areas are refused — a real life doesn't average.
+
+**Adding a room must not disturb the others.**
+Home stays one calm card per area. If a fifth room makes the map busier rather than fuller, the map is wrong, not the room.
+
+**The training engine is deterministic. No LLM in the programming loop.**
+Every prescription comes from published, outcome-proven methods (K Boges sub-max volume, One Hundred Push-ups, Pavel ladders, double progression, velocity-loss-derived fade thresholds, Foster session-RPE). Same inputs always produce the same session. `src/engine/` stays pure — no React Native imports, no `Date.now()` inside decisions, unit-tested.
 
 **Advise, never command.**
-Readiness pre-selects a chip; one tap overrides it. Form cues are observations ("chin clears the bar"), never orders — enforced by a test that rejects "must", "should", and "!". Interrupted sessions are offered, not resumed automatically. Rest-day awareness informs; it never blocks a workout.
+Form cues are observations ("chin clears the bar"), never orders — enforced by a test that rejects "must", "should", and "!". Interrupted sessions are offered, not resumed. Readiness informs; it never blocks. Supplements are placed, never demanded. Mind mirrors; it never instructs.
 
 **Measurement days stay honest.**
-Variations, autoregulation, and trims apply to volume and ladder days only. Pyramid finishers, max days, and tests are always the standard movement at full prescription — otherwise the numbers that drive the whole program start lying. Sessions marked `progressionExempt` (rough days, layoff ramps) can never lower a max or tighten a tune: exempt means *not judged*.
+Variations, autoregulation, and trims apply to volume and ladder days only. Max days and tests are always the standard movement at full prescription — otherwise the numbers driving the program start lying. `progressionExempt` means *not judged*.
 
 **Explain every decision.**
-Anything the engine changes, it says why, in plain language, with the actual numbers. Trust is earned by being inspectable — that's why the "why" layer exists and why adaptations report the metrics they acted on.
+Anything a module changes, it says why, in plain language, with the actual numbers. Trust is earned by being inspectable.
 
-**One body, three spaces.**
+**One body under one roof.**
 Pull-ups, push-ups, and running share a single load and readiness model (`src/engine/load.ts`). A hard pull day is not free when push day arrives.
 
 **Sessions are the source of truth.**
-All derived state (PRs, cycle position, tunes, lifetime counts) is rebuilt by replaying the log. Never store a computed value that replay can't reproduce.
+All derived state (PRs, cycle position, tunes, lifetime counts) is rebuilt by replaying the log. Never store a computed value replay can't reproduce.
 
 ## Refuse-list
 
@@ -29,10 +44,14 @@ Do not add, however well-intentioned:
 - Daily streaks — consistency is sessions per week, and a missed day must never feel like failure
 - Badges, XP, points, achievement toasts
 - Social features, feeds, leaderboards, sharing
-- An LLM chat coach, or an LLM anywhere in prescription
-- Health permissions the app doesn't actually display
-- Push notifications that nag
+- An LLM anywhere in prescription
+- Permissions for data the app doesn't actually display
+- A room for something its owner doesn't already do in real life
+
+## On notifications
+
+Roof is silent by default. The one exception is Mind, whose entire purpose is interrupting the habit of forgetting a good moment the second it happens — a mirror nobody looks into isn't a mirror. Those reminders belong to Mind alone, speak in its own warm voice, and never count, score, or scold. No other room may schedule anything.
 
 ## The point
 
-Rep counts are scaffolding. The app exists to celebrate what the body can do and to help its owner reflect and evolve — not to supervise him.
+Rep counts, doses, and logged signs are scaffolding. Roof exists so its owner can tend the areas of a life he is actually living — reflect, and evolve. Not to supervise him, and not to become somewhere he spends time.

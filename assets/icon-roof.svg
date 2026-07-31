@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#FAF9F5"/>
+  <!-- one bold pitched roof: shelter, nothing else -->
+  <path d="M512 236 L866 566 L866 706 L512 376 L158 706 L158 566 Z" fill="#C8633F"/>
+  <!-- the ground it stands on -->
+  <rect x="158" y="762" width="708" height="46" rx="23" fill="#22201C" opacity="0.14"/>
+</svg>

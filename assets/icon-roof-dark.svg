@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#22201C"/>
+  <!-- same shelter, night side: the roof warms slightly so it holds against ink -->
+  <path d="M512 236 L866 566 L866 706 L512 376 L158 706 L158 566 Z" fill="#D9714A"/>
+  <rect x="158" y="762" width="708" height="46" rx="23" fill="#FAF9F5" opacity="0.16"/>
+</svg>

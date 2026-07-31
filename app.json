@@ -1,11 +1,15 @@
 {
   "expo": {
-    "name": "Hangtime",
+    "name": "Roof",
     "slug": "hangtime",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "icon": {
+      "light": "./assets/icon.png",
+      "dark": "./assets/icon-dark.png",
+      "tinted": "./assets/icon-tinted.png"
+    },
+    "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.umutyg.hangtime",
       "buildNumber": "17",
@@ -20,9 +24,9 @@
       },
       "predictiveBackGestureEnabled": false
     },
-    "backgroundColor": "#0C0C0E",
+    "backgroundColor": "#FAF9F5",
     "splash": {
-      "backgroundColor": "#0C0C0E"
+      "backgroundColor": "#FAF9F5"
     },
     "plugins": [
       [
@@ -34,14 +38,14 @@
       [
         "@kingstinct/react-native-healthkit",
         {
-          "NSHealthShareUsageDescription": "Hangtime reads your running workouts from Apple Health to show them alongside your training.",
+          "NSHealthShareUsageDescription": "Roof reads your running workouts from Apple Health to show them alongside your training.",
           "background": false
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Hangtime uses your location to track distance and pace while you run — only during a run you start."
+          "locationWhenInUsePermission": "Roof uses your location to track distance and pace while you run — only during a run you start."
         }
       ]
     ]

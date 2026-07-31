@@ -5,7 +5,7 @@ import { useStore } from '../hooks/useStore';
 import { useWorkout } from '../hooks/useWorkout';
 import { theme, mono, modeIdentity, type } from '../theme';
 import { cycleMilestoneDates, fmtScheduleDate, setsRepsLabel } from '../engine/schedule';
-import { ModeSwitch } from '../components/ModeSwitch';
+import { RoofBar } from '../components/RoofBar';
 import { ModeMark } from '../components/ModeMark';
 import { ProgressRing } from '../components/ProgressRing';
 import { Sheet } from '../components/Sheet';
@@ -50,7 +50,7 @@ export function PushTodayScreen() {
     const valid = maxNum >= 3 && maxNum <= 200;
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-        <ModeSwitch />
+        <RoofBar />
         <Text style={styles.dateLabel}>{todayLabel()}</Text>
         <Text style={type.hero}>Push-ups</Text>
         <View style={styles.card}>
@@ -98,7 +98,7 @@ export function PushTodayScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <ModeSwitch />
+      <RoofBar />
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.dateLabel}>{todayLabel()}</Text>

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Store } from '../engine/types';
 import { defaultVolumeTune } from '../engine/constants';
 import { defaultPushVolumeTune } from '../engine/pushups';
+import { defaultStack } from '../engine/supplements';
 
 const KEY = 'hangtime.store.v1';
 
@@ -49,6 +50,8 @@ export function emptyStore(): Store {
     pushTrash: [],
     pushLifetimeReps: 0,
     externalReadiness: null,
+    supItems: defaultStack(),
+    supDays: [],
   };
 }
 
@@ -72,6 +75,13 @@ export function migrate(raw: unknown): Store {
       ...defaultPushVolumeTune(),
       ...(merged.pushState.volumeTune ?? {}),
     };
+  }
+  // supplement module arrived after launch — existing stores get the seeded stack
+  if (!merged.supItems || merged.supItems.length === 0) merged.supItems = defaultStack();
+  merged.supDays = merged.supDays ?? [];
+  // a stored 'supplements' appMode is fine; anything unknown falls back
+  if (!['pullups', 'pushups', 'running', 'supplements', 'mind'].includes(merged.appMode)) {
+    merged.appMode = 'pullups';
   }
   return merged;
 }

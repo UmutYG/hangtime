@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import { computePushGoal, pushMasteryPath, PUSH_MILESTONES } from '../engine/pushups';
 import { useStore } from '../hooks/useStore';
 import { theme, mono, type } from '../theme';
-import { ModeSwitch } from '../components/ModeSwitch';
+import { RoofBar } from '../components/RoofBar';
 import { TrendChart, Point } from '../components/TrendChart';
 import { SettingsSheet } from '../components/SettingsSheet';
 import { MasteryPath } from '../components/MasteryPath';
@@ -47,7 +47,7 @@ export function PushProgressScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <ModeSwitch />
+      <RoofBar />
       <View style={styles.headerRow}>
         <Text style={type.hero}>Progress</Text>
         <Pressable onPress={() => setSettingsOpen(true)} style={styles.gearBtn} hitSlop={10}>

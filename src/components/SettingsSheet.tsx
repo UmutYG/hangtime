@@ -3,7 +3,7 @@ import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'r
 import { useStore } from '../hooks/useStore';
 import { useWeeklyLoad } from '../hooks/useReadiness';
 import { exportJson } from '../lib/storage';
-import { theme, mono } from '../theme';
+import { BRAND, theme, mono } from '../theme';
 import { Sheet } from './Sheet';
 
 const SYNC_LABEL: Record<string, string> = {
@@ -28,9 +28,14 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
   const [bwText, setBwText] = useState('');
   const [vestText, setVestText] = useState('');
 
-  const profile = store.profile!;
+  // reachable from the Roof home before any onboarding — profile may be null
+  const profile = store.profile;
   const s = store.state;
   const week = useWeeklyLoad();
+  const supWeekDays = (store.supDays ?? []).filter((d) => {
+    const gap = (Date.parse(new Date().toISOString().slice(0, 10)) - Date.parse(d.date)) / 86400000;
+    return gap >= 0 && gap < 7 && Object.keys(d.taken).length > 0;
+  }).length;
 
   const doExport = async () => {
     const json = exportJson(store);
@@ -39,7 +44,7 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `hangtime-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `${BRAND.toLowerCase()}-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
     } else {
@@ -81,6 +86,7 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
         <Text style={styles.syncText}>{SYNC_LABEL[syncState]}</Text>
       </View>
 
+      {profile ? (
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Bodyweight — {profile.bodyweightKg} kg</Text>
         <View style={styles.inlineRow}>
@@ -106,8 +112,9 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
           </Pressable>
         </View>
       </View>
+      ) : null}
 
-      {profile.equipment.mode === 'fixed' ? (
+      {profile && profile.equipment.mode === 'fixed' ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Vest weight — {profile.equipment.fixedLoadKg} kg</Text>
           <View style={styles.inlineRow}>
@@ -136,7 +143,7 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
       ) : null}
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Your training spaces</Text>
+        <Text style={styles.cardTitle}>Your spaces</Text>
         <View style={styles.modeRow}>
           <View style={[styles.modeDot, { backgroundColor: theme.accent }]} />
           <Text style={styles.modeName}>Pull-ups</Text>
@@ -154,6 +161,11 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
           <Text style={styles.modeName}>Running</Text>
           <Text style={[styles.modeMeta, mono]}>{week.run} load · 7d</Text>
         </View>
+        <View style={styles.modeRow}>
+          <View style={[styles.modeDot, { backgroundColor: theme.supp }]} />
+          <Text style={styles.modeName}>Supplements</Text>
+          <Text style={[styles.modeMeta, mono]}>{supWeekDays} of 7 days logged</Text>
+        </View>
         <Text style={styles.cardBody}>
           Readiness in each space accounts for all three — pull and push are opposite movements, so
           they share recovery rather than muscles.
@@ -169,20 +181,22 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
         </Text>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Pull-up program</Text>
-        <Text style={styles.cardBody}>
-          Cycle {s.cycle} · week {s.week} · training load{' '}
-          <Text style={mono}>
-            +
-            {profile.equipment.mode === 'fixed'
-              ? profile.equipment.fixedLoadKg
-              : s.weighted.loadKg}{' '}
-            kg
-          </Text>{' '}
-          · best max set <Text style={mono}>{s.bwBestMaxSet}</Text> reps
-        </Text>
-      </View>
+      {profile ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Pull-up program</Text>
+          <Text style={styles.cardBody}>
+            Cycle {s.cycle} · week {s.week} · training load{' '}
+            <Text style={mono}>
+              +
+              {profile.equipment.mode === 'fixed'
+                ? profile.equipment.fixedLoadKg
+                : s.weighted.loadKg}{' '}
+              kg
+            </Text>{' '}
+            · best max set <Text style={mono}>{s.bwBestMaxSet}</Text> reps
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.inlineRow}>
         <Pressable onPress={doExport} style={[styles.smallBtn, { flex: 1 }]}>

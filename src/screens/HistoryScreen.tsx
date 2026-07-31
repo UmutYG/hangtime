@@ -6,7 +6,7 @@ import { useStore } from '../hooks/useStore';
 import { theme, mono, type } from '../theme';
 import { ManualLog } from '../components/ManualLog';
 import { RunLog } from '../components/RunLog';
-import { ModeSwitch } from '../components/ModeSwitch';
+import { RoofBar } from '../components/RoofBar';
 import { SessionDetail } from '../components/SessionDetail';
 import { DAY_LABEL, DAY_TITLE } from '../lib/dayLabels';
 
@@ -87,7 +87,7 @@ export function HistoryScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <ModeSwitch />
+      <RoofBar />
       <View style={styles.headerRow}>
         <Text style={type.hero}>History</Text>
         <Pressable

@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoreProvider, useStore } from './src/hooks/useStore';
 import { WorkoutProvider, useWorkout } from './src/hooks/useWorkout';
+import { NavCtx, parentOf, RoofView } from './src/hooks/useNav';
+import { RoofHomeScreen } from './src/screens/RoofHomeScreen';
+import { BodyAreaScreen } from './src/screens/BodyAreaScreen';
+import { MindShell } from './src/mind/MindShell';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { ProgressScreen } from './src/screens/ProgressScreen';
@@ -12,16 +16,19 @@ import { RunsHomeScreen } from './src/screens/RunsHomeScreen';
 import { RunTrendsScreen } from './src/screens/RunTrendsScreen';
 import { PushTodayScreen } from './src/screens/PushTodayScreen';
 import { PushProgressScreen } from './src/screens/PushProgressScreen';
+import { SupTodayScreen } from './src/screens/SupTodayScreen';
+import { SupBodyScreen } from './src/screens/SupBodyScreen';
+import { SupStackScreen } from './src/screens/SupStackScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { WorkoutOverlay } from './src/components/WorkoutOverlay';
-import { modeAccent, modeIdentity, theme } from './src/theme';
+import { RoofBar } from './src/components/RoofBar';
+import { AppMode, modeAccent, modeIdentity, theme } from './src/theme';
 
-// Same 3-slot shell in both spaces; the mode decides labels + screens.
+// Same 3-slot shell in every tabbed space; the space decides labels + screens.
+// Mind is not here — it renders its own four-tab shell (MindShell).
 type Slot = 0 | 1 | 2;
-const MODE_TABS: Record<
-  'pullups' | 'running' | 'pushups',
-  { labels: string[]; screens: React.ComponentType[] }
-> = {
+type TabbedMode = Exclude<AppMode, 'mind'>;
+const MODE_TABS: Record<TabbedMode, { labels: string[]; screens: React.ComponentType[] }> = {
   pullups: {
     labels: ['Today', 'History', 'Progress'],
     screens: [TodayScreen, HistoryScreen, ProgressScreen],
@@ -33,6 +40,10 @@ const MODE_TABS: Record<
   running: {
     labels: ['Runs', 'History', 'Trends'],
     screens: [RunsHomeScreen, HistoryScreen, RunTrendsScreen],
+  },
+  supplements: {
+    labels: ['Today', 'Body', 'Stack'],
+    screens: [SupTodayScreen, SupBodyScreen, SupStackScreen],
   },
 };
 
@@ -66,41 +77,85 @@ function TabBar({
   );
 }
 
-function Tabs() {
+function SpaceTabs({ space }: { space: TabbedMode }) {
   const { store } = useStore();
   const [active, setActive] = useState<Slot>(0);
-  const mode = store.appMode;
-  const { labels, screens } = MODE_TABS[mode];
+  // the pull-up space owns its own setup — the rest of the roof never waits on it
+  if (space === 'pullups' && !store.profile) {
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={{ paddingHorizontal: theme.pad, paddingTop: theme.pad }}>
+          <RoofBar />
+        </View>
+        <OnboardingScreen />
+      </View>
+    );
+  }
+  const { labels, screens } = MODE_TABS[space];
   const Screen = screens[active];
-  const accent = modeAccent(mode);
   return (
-    <View style={{ flex: 1, backgroundColor: modeIdentity(mode).wash }}>
+    <View style={{ flex: 1, backgroundColor: modeIdentity(space).wash }}>
       <Screen />
-      <TabBar labels={labels} active={active} accent={accent} onChange={setActive} />
+      <TabBar labels={labels} active={active} accent={modeAccent(space)} onChange={setActive} />
     </View>
   );
 }
 
-function WorkoutHost() {
+function Shell() {
+  const { store } = useStore();
   const workout = useWorkout();
-  const { store, completeSession, completePushSession } = useStore();
-  if (!workout.activePlan || !store.profile) return <Tabs />;
-  const isPush = workout.activePlan.dayKind.startsWith('push');
+  const { completeSession, completePushSession } = useStore();
+  const [view, setView] = useState<RoofView>('home');
+  const { setAppMode } = useStore();
+
+  const go = useCallback(
+    (v: RoofView) => {
+      setView(v);
+      if (v !== 'home' && v !== 'body') setAppMode(v); // accents/history filters read this
+    },
+    [setAppMode]
+  );
+  const goUp = useCallback(() => setView((v) => parentOf(v)), []);
+  const goHome = useCallback(() => setView('home'), []);
+
+  // a live workout owns the whole screen, wherever it was started from
+  if (workout.activePlan && store.profile) {
+    const isPush = workout.activePlan.dayKind.startsWith('push');
+    return (
+      <WorkoutOverlay
+        plan={workout.activePlan}
+        profile={store.profile}
+        readiness={workout.activeReadiness}
+        accent={isPush ? theme.push : theme.accent}
+        seed={workout.seed}
+        onCancel={workout.end}
+        onSave={isPush ? completePushSession : completeSession}
+      />
+    );
+  }
+
   return (
-    <WorkoutOverlay
-      plan={workout.activePlan}
-      profile={store.profile}
-      readiness={workout.activeReadiness}
-      accent={isPush ? theme.push : theme.accent}
-      seed={workout.seed}
-      onCancel={workout.end}
-      onSave={isPush ? completePushSession : completeSession}
-    />
+    <NavCtx.Provider value={{ view, go, goUp, goHome }}>
+      {view === 'home' ? (
+        <View style={{ flex: 1, backgroundColor: theme.bg }}>
+          <RoofHomeScreen />
+        </View>
+      ) : view === 'body' ? (
+        <View style={{ flex: 1, backgroundColor: theme.bg }}>
+          <BodyAreaScreen />
+        </View>
+      ) : view === 'mind' ? (
+        <MindShell />
+      ) : (
+        // key remounts the shell per space so the tab slot resets to the first tab
+        <SpaceTabs key={view} space={view} />
+      )}
+    </NavCtx.Provider>
   );
 }
 
 function Root() {
-  const { store, ready } = useStore();
+  const { ready } = useStore();
   const insets = useSafeAreaInsets();
   if (!ready) {
     return (
@@ -111,13 +166,9 @@ function Root() {
   }
   return (
     <View style={{ flex: 1, backgroundColor: theme.outerBg, paddingTop: insets.top }}>
-      {!store.profile ? (
-        <OnboardingScreen />
-      ) : (
-        <WorkoutProvider>
-          <WorkoutHost />
-        </WorkoutProvider>
-      )}
+      <WorkoutProvider>
+        <Shell />
+      </WorkoutProvider>
     </View>
   );
 }

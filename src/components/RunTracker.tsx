@@ -6,7 +6,7 @@ import { fmtDuration, fmtPace, Run } from '../engine/runs';
 import { formCueFor } from '../engine/formCues';
 import { theme, mono, type } from '../theme';
 
-// In-app GPS run tracking — no external app needed. V1 tracks while Hangtime
+// In-app GPS run tracking — no external app needed. V1 tracks while the app
 // is in the foreground; the screen is kept awake for the whole run.
 
 function haversineM(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }): number {
@@ -149,7 +149,7 @@ function TrackerInner({
         {phase === 'idle' ? (
           <>
             <Text style={styles.hint}>
-              GPS tracking runs inside Hangtime — keep the app open during your run; the screen stays
+              GPS tracking runs inside the app — keep the app open during your run; the screen stays
               awake automatically.
             </Text>
             <Text style={styles.formNote}>{formCueFor('run', cueSeed)}</Text>
@@ -160,7 +160,7 @@ function TrackerInner({
         ) : null}
         {phase === 'denied' ? (
           <Text style={styles.hint}>
-            Location access was declined — enable it in iOS Settings → Hangtime → Location to track
+            Location access was declined — enable it in iOS Settings → Roof → Location to track
             runs.
           </Text>
         ) : null}

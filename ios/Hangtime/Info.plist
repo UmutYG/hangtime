@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Hangtime</string>
+	<string>Roof</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,7 +45,7 @@
 		<true/>
 	</dict>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Hangtime reads your running workouts from Apple Health to show them alongside your training.</string>
+	<string>Roof reads your running workouts from Apple Health to show them alongside your training.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to update health info</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
@@ -53,7 +53,7 @@
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to access your location</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Hangtime uses your location to track distance and pace while you run — only during a run you start.</string>
+	<string>Roof uses your location to track distance and pace while you run — only during a run you start.</string>
 	<key>NSUbiquitousContainers</key>
 	<dict>
 		<key>iCloud.com.umutyg.hangtime</key>

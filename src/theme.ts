@@ -1,7 +1,14 @@
 import type { TextStyle } from 'react-native';
+import type { AppMode, SupplementMech } from './engine/types';
+
+export type { AppMode };
+
+/** the app's visible name — one life, one roof. Renaming the app = changing this
+ *  plus app.json "name" and Info.plist CFBundleDisplayName; nothing else. */
+export const BRAND = 'Roof';
 
 // Design tokens — warm cream surfaces, terracotta accent, hairline borders.
-// Sourced from the Hangtime Claude Design project ("Hangtime App.dc.html").
+// Originally from the Hangtime Claude Design project ("Hangtime App.dc.html").
 export const theme = {
   outerBg: '#ECE9E1',
   bg: '#FAF9F5',
@@ -23,6 +30,8 @@ export const theme = {
   danger: '#B0413E',
   run: '#3E7CB8',
   push: '#7C58A8',
+  supp: '#3F7D6B',
+  mind: '#6E6FA8',
   radius: 16,
   radiusLg: 20,
   radiusSheet: 24,
@@ -34,14 +43,24 @@ export const mono: TextStyle = {
   fontVariant: ['tabular-nums'],
 };
 
-/** each training space carries its own accent through every screen */
-export function modeAccent(mode: 'pullups' | 'running' | 'pushups'): string {
+/** each space carries its own accent through every screen */
+export function modeAccent(mode: AppMode): string {
   if (mode === 'running') return theme.run;
   if (mode === 'pushups') return theme.push;
+  if (mode === 'supplements') return theme.supp;
+  if (mode === 'mind') return theme.mind;
   return theme.accent;
 }
 
-export type AppMode = 'pullups' | 'pushups' | 'running';
+/** the five absorption mechanisms keep their Protocol colors — they are the
+ *  supplement module's inner language, distinct from the space accent */
+export const MECH_COLOR: Record<SupplementMech, string> = {
+  fat: '#C77A1E',
+  gate: '#17796B',
+  clear: '#3C6DBF',
+  door: '#8E3F86',
+  food: '#6B7A62',
+};
 
 export interface ModeIdentity {
   accent: string;
@@ -75,6 +94,20 @@ const IDENTITY: Record<AppMode, ModeIdentity> = {
     name: 'Running',
     motto: 'Forward, one stride at a time.',
     verb: 'Start run',
+  },
+  supplements: {
+    accent: theme.supp,
+    wash: '#F4F8F5',
+    name: 'Supplements',
+    motto: 'What you take, placed where it works.',
+    verb: 'Log the day',
+  },
+  mind: {
+    accent: theme.mind,
+    wash: '#FAF9F5',
+    name: 'Mind',
+    motto: 'A mirror for the signs you would forget.',
+    verb: 'Notice',
   },
 };
 

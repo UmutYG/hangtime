@@ -2,6 +2,9 @@
 
 export type ISODate = string;
 
+/** every space under the roof — theme.ts re-exports this so UI keeps importing it from there */
+export type AppMode = 'pullups' | 'pushups' | 'running' | 'supplements' | 'mind';
+
 export type DayKind =
   | 'calibration'
   | 'heavy'
@@ -199,6 +202,36 @@ export interface PushState {
   volumeTune: VolumeTune;
 }
 
+/** which absorption mechanism governs a supplement — drives color, tag, and placement advice */
+export type SupplementMech = 'fat' | 'gate' | 'clear' | 'door' | 'food';
+
+/** ties a seeded item to its rich physiology panel; user-added items have none */
+export type SupplementKind = 'creatine' | 'omega' | 'magPm' | 'zinc' | 'd3';
+
+export interface SupplementItem {
+  id: string;
+  name: string;
+  /** free-text timing line, e.g. "06:00 · fasted, water" */
+  slot: string;
+  mech: SupplementMech;
+  /** what it's doing right after you take it */
+  doing?: string;
+  /** why it sits at this point of the day */
+  why?: string;
+  /** what to notice / the number that judges it */
+  notice?: string;
+  kind?: SupplementKind;
+  /** archived items keep their history but leave the daily list */
+  active: boolean;
+  order: number;
+}
+
+/** one calendar day of supplement logging: itemId → local time string ("14:05") */
+export interface SupplementDay {
+  date: ISODate;
+  taken: Record<string, string>;
+}
+
 export interface TestPoint {
   quality: 'bwReps' | 'weighted';
   value: number; // reps for bwReps, e1RM kg for weighted
@@ -230,8 +263,8 @@ export interface Store {
   deletedRunIds: string[];
   /** user has connected Apple Health — auto-sync runs on launch */
   healthEnabled: boolean;
-  /** which training space the app is showing */
-  appMode: 'pullups' | 'running' | 'pushups';
+  /** which space the app is showing (last entered — the hub home is UI state, not stored) */
+  appMode: AppMode;
   /** push-up module — null until the user enters their max */
   pushState: PushState | null;
   /** the max the user first entered — replay seed for history edits */
@@ -243,6 +276,10 @@ export interface Store {
   externalReadiness?: import('./load').ExternalReadiness | null;
   /** optional daily joint check-ins, newest last; feeds pull + push readiness */
   jointLog?: JointReport[];
+  /** supplement stack — editable in-app; archived items stay for history */
+  supItems?: SupplementItem[];
+  /** supplement log, one entry per calendar day with anything taken */
+  supDays?: SupplementDay[];
   /** last local mutation, ISO datetime — drives cloud-sync conflict resolution */
   updatedAt?: string;
 }

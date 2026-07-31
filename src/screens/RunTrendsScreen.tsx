@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import { fmtPace, runStats, weeklyKmSeries } from '../engine/runs';
 import { useStore } from '../hooks/useStore';
 import { theme, mono, type } from '../theme';
-import { ModeSwitch } from '../components/ModeSwitch';
+import { RoofBar } from '../components/RoofBar';
 import { WeeklyBars } from '../components/WeeklyBars';
 import { SettingsSheet } from '../components/SettingsSheet';
 
@@ -22,7 +22,7 @@ export function RunTrendsScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <ModeSwitch />
+      <RoofBar />
       <View style={styles.headerRow}>
         <Text style={type.hero}>Trends</Text>
         <Pressable onPress={() => setSettingsOpen(true)} style={styles.gearBtn} hitSlop={10}>

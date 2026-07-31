@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mergeStores, storeDiffers } from '../merge';
 import { initialState } from '../generator';
 import { initialPushState } from '../pushups';
-import { LoggedSession, Profile, Store } from '../types';
+import { LoggedSession, Profile, Store, SupplementDay } from '../types';
 import { Run } from '../runs';
 
 const profile: Profile = {
@@ -33,6 +33,8 @@ function baseStore(updatedAt: string): Store {
     pushTrash: [],
     pushLifetimeReps: 0,
     externalReadiness: null,
+    supItems: [],
+    supDays: [],
     updatedAt,
   };
 }
@@ -152,6 +154,52 @@ describe('merging two devices', () => {
     const local = baseStore('2026-07-27T10:00:00Z');
     const cloud = baseStore('2026-07-27T12:00:00Z');
     expect(mergeStores(local, cloud).updatedAt).toBe('2026-07-27T12:00:00Z');
+  });
+
+  it('unions supplement days, combining ticks within a shared day', () => {
+    const local = {
+      ...baseStore('2026-07-27T10:00:00Z'),
+      supDays: [
+        { date: '2026-07-26', taken: { creatine: '19:00' } },
+        { date: '2026-07-27', taken: { mag_am: '06:05' } },
+      ] as SupplementDay[],
+    };
+    const cloud = {
+      ...baseStore('2026-07-27T12:00:00Z'),
+      supDays: [{ date: '2026-07-27', taken: { omega: '13:10' } }],
+    };
+    const merged = mergeStores(local, cloud);
+    expect(merged.supDays).toEqual([
+      { date: '2026-07-26', taken: { creatine: '19:00' } },
+      { date: '2026-07-27', taken: { mag_am: '06:05', omega: '13:10' } },
+    ]);
+  });
+
+  it('keeps supplement items from both sides, newer store winning edits', () => {
+    const item = (id: string, name: string) => ({
+      id,
+      name,
+      slot: 'Dinner',
+      mech: 'food' as const,
+      active: true,
+      order: 0,
+    });
+    const local = {
+      ...baseStore('2026-07-27T10:00:00Z'),
+      supItems: [item('a', 'Old name'), item('b', 'Local only')],
+    };
+    const cloud = { ...baseStore('2026-07-27T12:00:00Z'), supItems: [item('a', 'New name')] };
+    const merged = mergeStores(local, cloud);
+    expect(merged.supItems?.map((i) => i.name).sort()).toEqual(['Local only', 'New name']);
+  });
+
+  it('storeDiffers notices a new supplement tick', () => {
+    const a = baseStore('2026-07-27T10:00:00Z');
+    const b = {
+      ...baseStore('2026-07-27T12:00:00Z'),
+      supDays: [{ date: '2026-07-27', taken: { creatine: '19:00' } }],
+    };
+    expect(storeDiffers(a, b)).toBe(true);
   });
 
   it('merges joint check-ins, newest write winning per day', () => {

@@ -58,8 +58,8 @@ export function OnboardingScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.logo}>Hangtime</Text>
-        <Text style={styles.tag}>Pull-ups. Auto-planned. Explained.</Text>
+        <Text style={styles.logo}>Pull-ups</Text>
+        <Text style={styles.tag}>Auto-planned, explained — set up this space once.</Text>
 
         <View style={styles.card}>
           <Text style={styles.label}>Bodyweight (kg)</Text>

@@ -10,7 +10,7 @@ import { WhyCard } from '../components/WhyCard';
 import { WhySheet } from '../components/WhySheet';
 import { ManualLog } from '../components/ManualLog';
 import { ProgressRing } from '../components/ProgressRing';
-import { ModeSwitch } from '../components/ModeSwitch';
+import { RoofBar } from '../components/RoofBar';
 import { ReadinessCard } from '../components/ReadinessCard';
 import { ResumeCard } from '../components/ResumeCard';
 import { workoutMode } from '../engine/activeWorkout';
@@ -78,7 +78,7 @@ export function TodayScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <ModeSwitch />
+      <RoofBar />
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.dateLabel}>

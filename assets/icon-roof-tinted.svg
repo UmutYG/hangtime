@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- tinted: iOS supplies the colour, so this is pure luminance on black -->
+  <rect width="1024" height="1024" fill="#000000"/>
+  <path d="M512 236 L866 566 L866 706 L512 376 L158 706 L158 566 Z" fill="#FFFFFF"/>
+  <rect x="158" y="762" width="708" height="46" rx="23" fill="#FFFFFF" opacity="0.34"/>
+</svg>

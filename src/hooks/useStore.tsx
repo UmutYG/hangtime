@@ -8,7 +8,8 @@ import React, {
 } from 'react';
 import { applyResult, replayAll } from '../engine/stateMachine';
 import { applyPushResult, initialPushState, replayPushAll } from '../engine/pushups';
-import { JointFeel, LoggedSession, Profile, Store } from '../engine/types';
+import { JointFeel, LoggedSession, Profile, Store, SupplementItem } from '../engine/types';
+import { toggleTaken } from '../engine/supplements';
 import { mergeRuns, Run } from '../engine/runs';
 import { initialState } from '../engine/generator';
 import { emptyStore, importJson, loadStore, saveStore, stamp } from '../lib/storage';
@@ -42,6 +43,12 @@ interface StoreApi {
   deletePushSession: (id: string) => void;
   restorePushSession: (id: string) => void;
   emptyPushTrash: () => void;
+  /** tick/untick a supplement for today, stamping the local time */
+  toggleSupplement: (itemId: string) => void;
+  /** add a new item or save edits to an existing one (matched by id) */
+  saveSupItem: (item: SupplementItem) => void;
+  /** archive keeps history attached; restore brings it back to the daily list */
+  setSupItemActive: (id: string, active: boolean) => void;
   importStore: (json: string) => boolean;
   resetAll: () => void;
   syncNow: () => Promise<void>;
@@ -309,6 +316,37 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     update((s) => ({ ...s, pushTrash: [] }));
   }, [update]);
 
+  const toggleSupplement = useCallback(
+    (itemId: string) => {
+      const today = new Date().toISOString().slice(0, 10);
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      update((s) => ({ ...s, supDays: toggleTaken(s.supDays ?? [], today, itemId, time) }));
+    },
+    [update]
+  );
+
+  const saveSupItem = useCallback(
+    (item: SupplementItem) => {
+      update((s) => {
+        const items = s.supItems ?? [];
+        const exists = items.some((i) => i.id === item.id);
+        const next = exists ? items.map((i) => (i.id === item.id ? item : i)) : [...items, item];
+        return { ...s, supItems: next.sort((a, b) => a.order - b.order) };
+      });
+    },
+    [update]
+  );
+
+  const setSupItemActive = useCallback(
+    (id: string, active: boolean) => {
+      update((s) => ({
+        ...s,
+        supItems: (s.supItems ?? []).map((i) => (i.id === id ? { ...i, active } : i)),
+      }));
+    },
+    [update]
+  );
+
   const addRun = useCallback(
     (run: Run) => {
       update((s) => ({ ...s, runs: mergeRuns(s.runs, [run], s.deletedRunIds) }));
@@ -427,6 +465,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         deletePushSession,
         restorePushSession,
         emptyPushTrash,
+        toggleSupplement,
+        saveSupItem,
+        setSupItemActive,
         importStore,
         resetAll,
         syncNow,

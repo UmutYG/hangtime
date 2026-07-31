@@ -6,7 +6,7 @@
 // id instead. Everything derived (state, PRs, tests, lifetime counters) is
 // recomputed by replay afterwards rather than copied from either side.
 
-import { JointReport, LoggedSession, Store } from './types';
+import { JointReport, LoggedSession, Store, SupplementDay, SupplementItem } from './types';
 import { replayAll } from './stateMachine';
 import { replayPushAll } from './pushups';
 import { mergeRuns } from './runs';
@@ -24,6 +24,27 @@ function mergeJointLogs(primary: JointReport[], secondary: JointReport[]): Joint
   for (const j of secondary) byDate.set(j.date, j);
   for (const j of primary) byDate.set(j.date, j);
   return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(-120);
+}
+
+/** Item edits win from the newer store; items only one side knows survive. */
+function mergeSupItems(primary: SupplementItem[], secondary: SupplementItem[]): SupplementItem[] {
+  const byId = new Map<string, SupplementItem>();
+  for (const it of secondary) byId.set(it.id, it);
+  for (const it of primary) byId.set(it.id, it);
+  return [...byId.values()].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+}
+
+/** Union by date; within a day, ticks from both devices combine. A same-day
+ *  untoggle on one device can resurrect from the other — accepted for a
+ *  single-user reality, and one extra tick beats a lost one. */
+function mergeSupDays(primary: SupplementDay[], secondary: SupplementDay[]): SupplementDay[] {
+  const byDate = new Map<string, SupplementDay>();
+  for (const d of secondary) byDate.set(d.date, d);
+  for (const d of primary) {
+    const other = byDate.get(d.date);
+    byDate.set(d.date, other ? { date: d.date, taken: { ...other.taken, ...d.taken } } : d);
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /**
@@ -59,6 +80,8 @@ export function mergeStores(local: Store, cloud: Store): Store {
     pushStartingMax: primary.pushState ? primary.pushStartingMax : secondary.pushStartingMax,
     healthEnabled: primary.healthEnabled || secondary.healthEnabled,
     jointLog: mergeJointLogs(primary.jointLog ?? [], secondary.jointLog ?? []),
+    supItems: mergeSupItems(primary.supItems ?? [], secondary.supItems ?? []),
+    supDays: mergeSupDays(primary.supDays ?? [], secondary.supDays ?? []),
     sessions,
     trash,
     pushSessions,
@@ -105,6 +128,8 @@ export function storeDiffers(a: Store, b: Store): boolean {
       s.pushTrash.map((x) => x.id),
       s.deletedRunIds,
       (s.jointLog ?? []).map((j) => `${j.date}:${j.feel}`),
+      (s.supDays ?? []).map((d) => `${d.date}:${Object.keys(d.taken).sort().join(',')}`),
+      (s.supItems ?? []).map((i) => `${i.id}:${i.active ? 1 : 0}:${i.name}`),
       s.profile !== null,
     ]);
   return key(a) !== key(b);

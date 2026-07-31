@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import { fmtDuration, fmtPace, paceSecPerKm, Run, runStats, weeklyKmSeries } from '../engine/runs';
 import { useStore } from '../hooks/useStore';
 import { theme, mono, modeIdentity, type } from '../theme';
-import { ModeSwitch } from '../components/ModeSwitch';
+import { RoofBar } from '../components/RoofBar';
 import { ModeMark } from '../components/ModeMark';
 import { WeeklyBars } from '../components/WeeklyBars';
 import { RunLog } from '../components/RunLog';
@@ -56,7 +56,7 @@ export function RunsHomeScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <ModeSwitch />
+      <RoofBar />
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.dateLabel}>{todayLabel()}</Text>

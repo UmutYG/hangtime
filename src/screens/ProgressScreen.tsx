@@ -6,7 +6,7 @@ import { e1rmSystem } from '../engine/epley';
 import { theme, mono, type } from '../theme';
 import { TrendChart, Point } from '../components/TrendChart';
 import { SettingsSheet } from '../components/SettingsSheet';
-import { ModeSwitch } from '../components/ModeSwitch';
+import { RoofBar } from '../components/RoofBar';
 import { MasteryPath } from '../components/MasteryPath';
 import { pullMasteryPath } from '../engine/pullVariations';
 
@@ -80,7 +80,7 @@ export function ProgressScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <ModeSwitch />
+      <RoofBar />
       <View style={styles.headerRow}>
         <Text style={type.hero}>Progress</Text>
         <Pressable onPress={() => setSettingsOpen(true)} style={styles.gearBtn} hitSlop={10}>
