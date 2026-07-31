@@ -10,8 +10,11 @@ The phone is a tool, not the point. Every room has to earn its place by mapping 
 
 ## Hard constraints
 
-**No accounts, no backend.**
-Everything lives on the device; iCloud is the only safety net. Nothing here is worth a login screen or someone else's server.
+**One backup, covering everything.**
+Rooms own their storage, but they do not own their own cloud. There is exactly one snapshot — training, supplements, mind — pushed to one account (`src/lib/roofBackup.ts`). A room that invents its own sync is how data ends up stranded in a system nothing else can read. Sign-in is optional and asked for once; the app is fully usable without it.
+
+**A restore may never destroy.**
+Restoring merges — the store through the same union-merge that guards device-to-device sync, mind keys by key. A backup file can only ever write keys the app already knows. Nothing pushes to an account before it has read what is already there.
 
 **Modules are sovereign.**
 A room owns its data, its storage keys, its screens, and its language. Body's readiness engine and Mind's mirror share nothing but the roof over them. Cross-module dashboards, unified scores, and "insights" blending unrelated areas are refused — a real life doesn't average.

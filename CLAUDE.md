@@ -7,6 +7,8 @@
 
 Adding a room = a new `AppMode`, a theme identity, a home card, and a shell. Never bolt a new life area onto an existing room.
 
+**Backup is central, not per-room.** `src/lib/roofBackup.ts` builds one snapshot (the store + every room's AsyncStorage keys); `src/lib/roofCloud.ts` pushes it to Supabase `user_backups` behind Sign in with Apple — the same project and row the standalone Slide app uses, which is how that data was migrated. A new room must add its keys to `MIND_KEYS`-style lists there rather than inventing its own cloud path. Two invariants: restores **merge** (never replace), and nothing pushes before it has pulled in that session, so an unseen backup can't be overwritten. Roof snapshots also mirror mind keys under `data` so the standalone Slide app can still read them.
+
 Visible brand name lives in exactly three places: `BRAND` in `src/theme.ts`, `name` in `app.json`, `CFBundleDisplayName` in `ios/Hangtime/Info.plist`. Bundle id, slug, repo name, iCloud container and AsyncStorage keys all still say `hangtime` **on purpose** — renaming them orphans TestFlight lineage and user data.
 
 # Verifying changes

@@ -2,65 +2,22 @@ import React, { useEffect, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, Pressable } from "react-native";
 import { colors, font, radius, spacing } from "../lib/theme";
 import { useSettings } from "../lib/SettingsContext";
-import { Card, Label, Field, GhostButton, PrimaryButton } from "../components/ui";
-import { pushMindToCloud } from "../lib/mindCloud";
-import { importBackup } from "../lib/backup";
+import { Card, Label, Field, PrimaryButton } from "../components/ui";
 
-// Mind settings — the standalone Slide app's screen minus its Supabase/Apple
-// sign-in world: inside Roof the safety net is the shared iCloud container,
-// no accounts. A one-time paste-import brings data over from standalone Slide.
+// Mind settings — what belongs to this room only. Backup is not here: Roof
+// keeps one central snapshot covering every room (Roof → ⚙), so this module
+// never has its own cloud story to get out of step with.
 
 export default function SettingsScreen() {
-  const { t, settings, update, reload } = useSettings();
+  const { t, settings, update } = useSettings();
   const [apiKey, setApiKey] = useState("");
   const [keySaved, setKeySaved] = useState(false);
-
-  const [cloudBusy, setCloudBusy] = useState(false);
-  const [cloudMsg, setCloudMsg] = useState<string | null>(null);
-
-  const [importOpen, setImportOpen] = useState(false);
-  const [importText, setImportText] = useState("");
-  const [importMsg, setImportMsg] = useState<string | null>(null);
 
   const tr = settings.language === "tr";
 
   useEffect(() => {
     setApiKey(settings.apiKey);
   }, [settings.apiKey]);
-
-  async function doBackup() {
-    setCloudBusy(true);
-    setCloudMsg(null);
-    const ok = await pushMindToCloud();
-    setCloudMsg(
-      ok
-        ? tr
-          ? "iCloud'a yedeklendi."
-          : "Backed up to iCloud."
-        : tr
-          ? "iCloud şu an erişilebilir değil."
-          : "iCloud isn't reachable right now."
-    );
-    setCloudBusy(false);
-  }
-
-  async function doImport() {
-    setImportMsg(null);
-    try {
-      const n = await importBackup(importText.trim());
-      if (n === 0) {
-        setImportMsg(tr ? "Dosyada içe aktarılacak bir şey yok." : "Nothing to import in that file.");
-        return;
-      }
-      await reload();
-      setImportText("");
-      setImportOpen(false);
-      setCloudMsg(tr ? "Slide verilerin içe aktarıldı." : "Your Slide data was imported.");
-      void pushMindToCloud();
-    } catch {
-      setImportMsg(tr ? "Bu bir Slide yedeği gibi görünmüyor." : "That doesn't look like a Slide backup.");
-    }
-  }
 
   async function saveKey() {
     await update({ apiKey: apiKey.trim() });
@@ -116,41 +73,12 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={{ marginTop: spacing.md }}>
-        <Label>iCloud</Label>
+        <Label>{tr ? "Yedekleme" : "Backup"}</Label>
         <Text style={styles.info}>
           {tr
-            ? "Zihin alanın Roof'un iCloud kutusuna yedeklenir — hesap yok, sunucu yok. Uygulama arka plana her geçtiğinde sessizce yedeklenir."
-            : "The mind space backs up to Roof's iCloud container — no accounts, no server. It snapshots quietly every time the app goes to the background."}
+            ? "Burada değil: Roof tek bir yedek tutuyor ve bu alan da onun içinde. Roof ana ekranı → ⚙ → hesabına giriş yap."
+            : "Not here: Roof keeps one backup covering every room, this one included. Roof home → ⚙ → sign in to your account."}
         </Text>
-        <View style={{ height: spacing.md }} />
-        <PrimaryButton
-          title={cloudBusy ? (tr ? "Yedekleniyor…" : "Backing up…") : tr ? "Şimdi yedekle" : "Back up now"}
-          onPress={doBackup}
-          disabled={cloudBusy}
-        />
-        <View style={{ height: spacing.sm }} />
-        <GhostButton
-          title={tr ? "Slide yedeğinden içe aktar" : "Import from a Slide backup"}
-          onPress={() => setImportOpen(!importOpen)}
-        />
-        {importOpen && (
-          <>
-            <View style={{ height: spacing.sm }} />
-            <Field
-              value={importText}
-              onChangeText={setImportText}
-              placeholder={tr ? "Slide yedek JSON'unu buraya yapıştır" : "Paste the Slide backup JSON here"}
-              autoCapitalize="none"
-              autoCorrect={false}
-              multiline
-              style={{ minHeight: 90, textAlignVertical: "top" }}
-            />
-            <View style={{ height: spacing.sm }} />
-            <PrimaryButton title={tr ? "İçe aktar" : "Import"} onPress={doImport} />
-            {importMsg && <Text style={styles.cloudMsg}>{importMsg}</Text>}
-          </>
-        )}
-        {cloudMsg && <Text style={styles.cloudMsg}>{cloudMsg}</Text>}
       </Card>
 
       {settings.archivedVisions.length > 0 && (

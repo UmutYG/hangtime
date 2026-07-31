@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, font, spacing } from "./lib/theme";
 import { pruneOldEvents } from "./lib/events";
 import { ensureNotifications, handleNotificationResponse } from "./lib/notifications";
-import { pushMindToCloud, restoreMindIfEmpty } from "./lib/mindCloud";
 import { SettingsProvider, useSettings } from "./lib/SettingsContext";
 import PracticeScreen from "./screens/PracticeScreen";
 import FlowScreen from "./screens/FlowScreen";
@@ -26,22 +25,15 @@ function Shell() {
   const [tab, setTab] = useState<Tab>("practice");
   const insets = useSafeAreaInsets();
 
-  // Boot: if this install's mind is empty and an iCloud snapshot exists
-  // (reinstall / new phone), restore it before the user types anything.
-  useEffect(() => {
-    restoreMindIfEmpty().then((r) => {
-      if (r === "restored") reload();
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Backgrounding quietly snapshots the mind to iCloud. Best-effort.
+  // Backup lives one level up: Roof's central snapshot covers this module's
+  // storage along with everything else (src/lib/roofBackup.ts). A restore
+  // writes those keys underneath us, so re-read settings when we come back.
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
-      if (state === "background") pushMindToCloud();
+      if (state === "active") reload();
     });
     return () => sub.remove();
-  }, []);
+  }, [reload]);
 
   useEffect(() => {
     if (!ready) return;

@@ -22,11 +22,24 @@ const SYNC_DOT: Record<string, string> = {
 };
 
 export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { store, updateProfile, importStore, resetAll, syncState } = useStore();
+  const {
+    store,
+    updateProfile,
+    resetAll,
+    syncState,
+    cloudUser,
+    cloudSignIn,
+    cloudSignOut,
+    cloudBackupNow,
+    cloudRestore,
+    restoreFromJson,
+  } = useStore();
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [bwText, setBwText] = useState('');
   const [vestText, setVestText] = useState('');
+  const [cloudBusy, setCloudBusy] = useState(false);
+  const [cloudMsg, setCloudMsg] = useState<string | null>(null);
 
   // reachable from the Roof home before any onboarding — profile may be null
   const profile = store.profile;
@@ -36,6 +49,50 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
     const gap = (Date.parse(new Date().toISOString().slice(0, 10)) - Date.parse(d.date)) / 86400000;
     return gap >= 0 && gap < 7 && Object.keys(d.taken).length > 0;
   }).length;
+
+  const say = (msg: string) => {
+    setCloudMsg(msg);
+    setCloudBusy(false);
+  };
+
+  const records = (n: number) => `${n} record${n === 1 ? '' : 's'}`;
+
+  const describe = (r: { mindKeys: number; shape: string } | null) => {
+    if (!r) return 'Signed in. Nothing backed up to this account yet.';
+    if (r.shape === 'slide-legacy') {
+      return `Your Slide data came home — ${records(r.mindKeys)} restored into Mind. Back up now to save everything in the new format.`;
+    }
+    return `Restored from your account${r.mindKeys ? ` — ${records(r.mindKeys)} in Mind` : ''}.`;
+  };
+
+  const doSignIn = async () => {
+    setCloudBusy(true);
+    setCloudMsg(null);
+    try {
+      say(describe(await cloudSignIn()));
+    } catch (e: any) {
+      // the user dismissing Apple's sheet isn't an error worth shouting about
+      if (e?.code === 'ERR_REQUEST_CANCELED') setCloudBusy(false);
+      else say(`Couldn't sign in — ${e?.message ?? 'unknown error'}`);
+    }
+  };
+
+  const doCloudBackup = async () => {
+    setCloudBusy(true);
+    setCloudMsg(null);
+    say((await cloudBackupNow()) ? 'Backed up to your account.' : "Couldn't reach your account.");
+  };
+
+  const doCloudRestore = async () => {
+    setCloudBusy(true);
+    setCloudMsg(null);
+    try {
+      const r = await cloudRestore();
+      say(r ? describe(r) : 'This account has no backup yet.');
+    } catch (e: any) {
+      say(`Restore failed — ${e?.message ?? 'unknown error'}`);
+    }
+  };
 
   const doExport = async () => {
     const json = exportJson(store);
@@ -53,14 +110,18 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
     }
   };
 
-  const doImport = () => {
-    if (importStore(importText.trim())) {
+  // Accepts a Roof snapshot or a Slide export — applySnapshot knows both, and
+  // merges rather than replaces, so pasting an old file can't erase newer work.
+  const doImport = async () => {
+    try {
+      const r = await restoreFromJson(importText.trim());
       setImportOpen(false);
       setImportText('');
-    } else if (Platform.OS === 'web') {
-      window.alert('Could not read that backup JSON.');
-    } else {
-      Alert.alert('Import failed', 'Could not read that backup JSON.');
+      say(describe(r));
+    } catch {
+      const msg = "That didn't look like a Roof or Slide backup.";
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Import failed', msg);
     }
   };
 
@@ -81,9 +142,51 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
 
   return (
     <Sheet visible={visible} onClose={onClose} title="Settings">
-      <View style={styles.row}>
-        <View style={[styles.dot, { backgroundColor: SYNC_DOT[syncState] }]} />
-        <Text style={styles.syncText}>{SYNC_LABEL[syncState]}</Text>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Backup</Text>
+        <Text style={styles.cardBody}>
+          One backup for the whole roof — training, supplements and mind together, in your
+          account. It saves itself every time you leave the app.
+        </Text>
+
+        {cloudUser ? (
+          <>
+            <Text style={styles.signedIn}>Signed in as {cloudUser.email ?? 'your Apple ID'}</Text>
+            <View style={styles.inlineRow}>
+              <Pressable
+                onPress={doCloudBackup}
+                disabled={cloudBusy}
+                style={[styles.smallBtn, { flex: 1 }]}
+              >
+                <Text style={styles.smallBtnText}>{cloudBusy ? 'Working…' : 'Back up now'}</Text>
+              </Pressable>
+              <Pressable
+                onPress={doCloudRestore}
+                disabled={cloudBusy}
+                style={[styles.smallBtn, { flex: 1 }]}
+              >
+                <Text style={styles.smallBtnText}>Restore</Text>
+              </Pressable>
+            </View>
+            <Pressable onPress={() => void cloudSignOut()} style={styles.linkBtn}>
+              <Text style={styles.linkText}>Sign out</Text>
+            </Pressable>
+          </>
+        ) : (
+          <Pressable onPress={doSignIn} disabled={cloudBusy} style={styles.appleBtn}>
+            <Text style={styles.appleIcon}></Text>
+            <Text style={styles.appleText}>
+              {cloudBusy ? 'Signing in…' : 'Sign in with Apple'}
+            </Text>
+          </Pressable>
+        )}
+
+        {cloudMsg ? <Text style={styles.cloudMsg}>{cloudMsg}</Text> : null}
+
+        <View style={styles.row}>
+          <View style={[styles.dot, { backgroundColor: SYNC_DOT[syncState] }]} />
+          <Text style={styles.syncText}>{SYNC_LABEL[syncState]}</Text>
+        </View>
       </View>
 
       {profile ? (
@@ -214,6 +317,13 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
             placeholder="Paste backup JSON here"
             placeholderTextColor={theme.textFaint}
             multiline
+            // iOS smart punctuation turns the quotes in JSON into curly ones
+            // and autocorrect rewrites the keys — either makes the paste
+            // unparseable, so this field takes text exactly as given.
+            autoCorrect={false}
+            autoCapitalize="none"
+            spellCheck={false}
+            keyboardType="ascii-capable"
             style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
           />
           <Pressable onPress={doImport} style={styles.smallBtn}>
@@ -271,4 +381,20 @@ const styles = StyleSheet.create({
   modeMeta: { fontSize: 12, color: theme.textFaint },
   dangerBtn: { alignItems: 'center', paddingVertical: 10 },
   dangerText: { color: theme.danger, fontSize: 13 },
+  signedIn: { color: theme.text, fontSize: 13.5, fontWeight: '600', marginTop: 2 },
+  appleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#000000',
+    borderRadius: 999,
+    paddingVertical: 13,
+    marginTop: 4,
+  },
+  appleIcon: { color: '#FFFFFF', fontSize: 16 },
+  appleText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  cloudMsg: { color: theme.accent, fontSize: 12.5, lineHeight: 18, marginTop: 4 },
+  linkBtn: { alignItems: 'center', paddingVertical: 6 },
+  linkText: { color: theme.textFaint, fontSize: 12.5 },
 });

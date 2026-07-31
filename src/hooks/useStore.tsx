@@ -6,6 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { AppState } from 'react-native';
 import { applyResult, replayAll } from '../engine/stateMachine';
 import { applyPushResult, initialPushState, replayPushAll } from '../engine/pushups';
 import { JointFeel, LoggedSession, Profile, Store, SupplementItem } from '../engine/types';
@@ -14,6 +15,17 @@ import { mergeRuns, Run } from '../engine/runs';
 import { initialState } from '../engine/generator';
 import { emptyStore, importJson, loadStore, saveStore, stamp } from '../lib/storage';
 import { isCloudAvailable, pullFromCloud, pushToCloud, SyncState } from '../lib/cloudSync';
+import {
+  backupIfSignedIn,
+  CloudUser,
+  getCurrentUser,
+  primeSession,
+  pullBackup,
+  pushBackup,
+  signInAndReconcile,
+  signOut,
+} from '../lib/roofCloud';
+import { applySnapshot } from '../lib/roofBackup';
 import { mergeStores, storeDiffers } from '../engine/merge';
 import { fetchRunsFromHealth, isHealthModuleAvailable, requestHealthAuth } from '../lib/health';
 
@@ -52,6 +64,17 @@ interface StoreApi {
   importStore: (json: string) => boolean;
   resetAll: () => void;
   syncNow: () => Promise<void>;
+  /** central backup: the signed-in account, or null */
+  cloudUser: CloudUser | null;
+  /** sign in with Apple and reconcile with whatever the account holds */
+  cloudSignIn: () => Promise<{ mindKeys: number; shape: string } | null>;
+  cloudSignOut: () => Promise<void>;
+  /** push the whole roof (store + every room's keys) to the account */
+  cloudBackupNow: () => Promise<boolean>;
+  /** pull the account snapshot and merge it in */
+  cloudRestore: () => Promise<{ mindKeys: number; shape: string } | null>;
+  /** restore from a pasted Roof or Slide backup file */
+  restoreFromJson: (json: string) => Promise<{ mindKeys: number; shape: string }>;
 }
 
 const Ctx = createContext<StoreApi | null>(null);
@@ -420,6 +443,72 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const resetAll = useCallback(() => update(() => emptyStore()), [update]);
 
+  // ——— central backup: one snapshot of the whole roof, kept in the account ———
+
+  const [cloudUser, setCloudUser] = useState<CloudUser | null>(null);
+  const storeRef = useRef(store);
+  storeRef.current = store;
+
+  // Already signed in from a previous launch? Read the account so background
+  // pushes are unblocked, and adopt anything it holds that we don't.
+  useEffect(() => {
+    if (!ready) return;
+    void (async () => {
+      const user = await getCurrentUser();
+      if (!user) return;
+      setCloudUser(user);
+      const restored = await primeSession(storeRef.current);
+      if (restored?.store) update(() => restored.store!);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+
+  // Every trip to the background quietly snapshots the roof to the account.
+  useEffect(() => {
+    if (!ready) return;
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'background') void backupIfSignedIn(storeRef.current);
+    });
+    return () => sub.remove();
+  }, [ready]);
+
+  const cloudSignIn = useCallback(async () => {
+    const { user, restored, store: merged } = await signInAndReconcile(storeRef.current);
+    setCloudUser(user);
+    if (merged) update(() => merged);
+    return restored ? { mindKeys: restored.mindKeys, shape: restored.shape } : null;
+  }, [update]);
+
+  const cloudSignOut = useCallback(async () => {
+    await signOut();
+    setCloudUser(null);
+  }, []);
+
+  const cloudBackupNow = useCallback(async () => {
+    try {
+      await pushBackup(storeRef.current);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const cloudRestore = useCallback(async () => {
+    const r = await pullBackup(storeRef.current);
+    if (!r) return null;
+    if (r.store) update(() => r.store!);
+    return { mindKeys: r.mindKeys, shape: r.shape };
+  }, [update]);
+
+  const restoreFromJson = useCallback(
+    async (json: string) => {
+      const r = await applySnapshot(json, storeRef.current);
+      if (r.store) update(() => r.store!);
+      return { mindKeys: r.mindKeys, shape: r.shape };
+    },
+    [update]
+  );
+
   const syncNow = useCallback(async () => {
     if (!(await isCloudAvailable())) {
       setSyncState('unavailable');
@@ -471,6 +560,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         importStore,
         resetAll,
         syncNow,
+        cloudUser,
+        cloudSignIn,
+        cloudSignOut,
+        cloudBackupNow,
+        cloudRestore,
+        restoreFromJson,
       }}
     >
       {children}

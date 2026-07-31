@@ -51,6 +51,8 @@ export function RoofHomeScreen() {
   const hasPending = workout.pending ? workoutMode(workout.pending) : null;
 
   // ——— Mind: today's noticed signs + the vision wall, read from the module ———
+  // Re-read when the settings sheet closes: a restore writes the mind's keys
+  // underneath us, and the card would otherwise still show the old count.
   const [mindLine, setMindLine] = useState<{ signsToday: number; visions: number } | null>(null);
   useEffect(() => {
     let alive = true;
@@ -64,7 +66,7 @@ export function RoofHomeScreen() {
     return () => {
       alive = false;
     };
-  }, [today]);
+  }, [today, settingsOpen]);
 
   // ——— Supplements ———
   const activeItems = (store.supItems ?? []).filter((i) => i.active);
