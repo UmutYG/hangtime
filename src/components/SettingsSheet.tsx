@@ -22,18 +22,8 @@ const SYNC_DOT: Record<string, string> = {
 };
 
 export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const {
-    store,
-    updateProfile,
-    resetAll,
-    syncState,
-    cloudUser,
-    cloudSignIn,
-    cloudSignOut,
-    cloudBackupNow,
-    cloudRestore,
-    restoreFromJson,
-  } = useStore();
+  const { store, updateProfile, resetAll, syncState, cloudBackupNow, cloudRestore, restoreFromJson } =
+    useStore();
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [bwText, setBwText] = useState('');
@@ -58,37 +48,24 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
   const records = (n: number) => `${n} record${n === 1 ? '' : 's'}`;
 
   const describe = (r: { mindKeys: number; shape: string } | null) => {
-    if (!r) return 'Signed in. Nothing backed up to this account yet.';
+    if (!r) return 'No backup in iCloud yet.';
     if (r.shape === 'slide-legacy') {
-      return `Your Slide data came home — ${records(r.mindKeys)} restored into Mind. Back up now to save everything in the new format.`;
+      return `Your Slide data came home — ${records(r.mindKeys)} restored into Mind.`;
     }
-    return `Restored from your account${r.mindKeys ? ` — ${records(r.mindKeys)} in Mind` : ''}.`;
-  };
-
-  const doSignIn = async () => {
-    setCloudBusy(true);
-    setCloudMsg(null);
-    try {
-      say(describe(await cloudSignIn()));
-    } catch (e: any) {
-      // the user dismissing Apple's sheet isn't an error worth shouting about
-      if (e?.code === 'ERR_REQUEST_CANCELED') setCloudBusy(false);
-      else say(`Couldn't sign in — ${e?.message ?? 'unknown error'}`);
-    }
+    return `Restored${r.mindKeys ? ` — ${records(r.mindKeys)} in Mind` : ''}.`;
   };
 
   const doCloudBackup = async () => {
     setCloudBusy(true);
     setCloudMsg(null);
-    say((await cloudBackupNow()) ? 'Backed up to your account.' : "Couldn't reach your account.");
+    say((await cloudBackupNow()) ? 'Backed up to iCloud.' : "iCloud isn't reachable right now.");
   };
 
   const doCloudRestore = async () => {
     setCloudBusy(true);
     setCloudMsg(null);
     try {
-      const r = await cloudRestore();
-      say(r ? describe(r) : 'This account has no backup yet.');
+      say(describe(await cloudRestore()));
     } catch (e: any) {
       say(`Restore failed — ${e?.message ?? 'unknown error'}`);
     }
@@ -145,41 +122,25 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Backup</Text>
         <Text style={styles.cardBody}>
-          One backup for the whole roof — training, supplements and mind together, in your
-          account. It saves itself every time you leave the app.
+          One backup for the whole roof — training, supplements and mind together, in your own
+          iCloud. No account, nothing to sign into. It saves itself every time you leave the app.
         </Text>
-
-        {cloudUser ? (
-          <>
-            <Text style={styles.signedIn}>Signed in as {cloudUser.email ?? 'your Apple ID'}</Text>
-            <View style={styles.inlineRow}>
-              <Pressable
-                onPress={doCloudBackup}
-                disabled={cloudBusy}
-                style={[styles.smallBtn, { flex: 1 }]}
-              >
-                <Text style={styles.smallBtnText}>{cloudBusy ? 'Working…' : 'Back up now'}</Text>
-              </Pressable>
-              <Pressable
-                onPress={doCloudRestore}
-                disabled={cloudBusy}
-                style={[styles.smallBtn, { flex: 1 }]}
-              >
-                <Text style={styles.smallBtnText}>Restore</Text>
-              </Pressable>
-            </View>
-            <Pressable onPress={() => void cloudSignOut()} style={styles.linkBtn}>
-              <Text style={styles.linkText}>Sign out</Text>
-            </Pressable>
-          </>
-        ) : (
-          <Pressable onPress={doSignIn} disabled={cloudBusy} style={styles.appleBtn}>
-            <Text style={styles.appleIcon}></Text>
-            <Text style={styles.appleText}>
-              {cloudBusy ? 'Signing in…' : 'Sign in with Apple'}
-            </Text>
+        <View style={styles.inlineRow}>
+          <Pressable
+            onPress={doCloudBackup}
+            disabled={cloudBusy}
+            style={[styles.smallBtn, { flex: 1 }]}
+          >
+            <Text style={styles.smallBtnText}>{cloudBusy ? 'Working…' : 'Back up now'}</Text>
           </Pressable>
-        )}
+          <Pressable
+            onPress={doCloudRestore}
+            disabled={cloudBusy}
+            style={[styles.smallBtn, { flex: 1 }]}
+          >
+            <Text style={styles.smallBtnText}>Restore</Text>
+          </Pressable>
+        </View>
 
         {cloudMsg ? <Text style={styles.cloudMsg}>{cloudMsg}</Text> : null}
 

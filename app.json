@@ -14,7 +14,6 @@
       "bundleIdentifier": "com.umutyg.hangtime",
       "buildNumber": "19",
       "supportsTablet": false,
-      "usesAppleSignIn": true,
       "config": {
         "usesNonExemptEncryption": false
       }

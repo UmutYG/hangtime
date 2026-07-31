@@ -14,18 +14,15 @@ import { toggleTaken } from '../engine/supplements';
 import { mergeRuns, Run } from '../engine/runs';
 import { initialState } from '../engine/generator';
 import { emptyStore, importJson, loadStore, saveStore, stamp } from '../lib/storage';
-import { isCloudAvailable, pullFromCloud, pushToCloud, SyncState } from '../lib/cloudSync';
 import {
-  backupIfSignedIn,
-  CloudUser,
-  getCurrentUser,
-  primeSession,
-  pullBackup,
-  pushBackup,
-  signInAndReconcile,
-  signOut,
-} from '../lib/roofCloud';
-import { applySnapshot } from '../lib/roofBackup';
+  isCloudAvailable,
+  pullFromCloud,
+  pullSnapshotFromICloud,
+  pushSnapshotToICloud,
+  pushToCloud,
+  SyncState,
+} from '../lib/cloudSync';
+import { applySnapshot, buildSnapshot } from '../lib/roofBackup';
 import { mergeStores, storeDiffers } from '../engine/merge';
 import { fetchRunsFromHealth, isHealthModuleAvailable, requestHealthAuth } from '../lib/health';
 
@@ -64,16 +61,11 @@ interface StoreApi {
   importStore: (json: string) => boolean;
   resetAll: () => void;
   syncNow: () => Promise<void>;
-  /** central backup: the signed-in account, or null */
-  cloudUser: CloudUser | null;
-  /** sign in with Apple and reconcile with whatever the account holds */
-  cloudSignIn: () => Promise<{ mindKeys: number; shape: string } | null>;
-  cloudSignOut: () => Promise<void>;
-  /** push the whole roof (store + every room's keys) to the account */
+  /** push the whole roof (store + every room's keys) to iCloud */
   cloudBackupNow: () => Promise<boolean>;
-  /** pull the account snapshot and merge it in */
+  /** pull the iCloud snapshot and merge it in */
   cloudRestore: () => Promise<{ mindKeys: number; shape: string } | null>;
-  /** restore from a pasted Roof or Slide backup file */
+  /** restore from a pasted Roof or Slide backup */
   restoreFromJson: (json: string) => Promise<{ mindKeys: number; shape: string }>;
 }
 
@@ -443,59 +435,37 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const resetAll = useCallback(() => update(() => emptyStore()), [update]);
 
-  // ——— central backup: one snapshot of the whole roof, kept in the account ———
+  // ——— central backup: one snapshot of the whole roof, kept in iCloud ———
+  //
+  // No account, nothing to sign into, and nothing that can be deleted out from
+  // under it — the live store sync above keeps devices converged, this is the
+  // full snapshot (mind included) a fresh install reads to get everything back.
 
-  const [cloudUser, setCloudUser] = useState<CloudUser | null>(null);
   const storeRef = useRef(store);
   storeRef.current = store;
 
-  // Already signed in from a previous launch? Read the account so background
-  // pushes are unblocked, and adopt anything it holds that we don't.
-  useEffect(() => {
-    if (!ready) return;
-    void (async () => {
-      const user = await getCurrentUser();
-      if (!user) return;
-      setCloudUser(user);
-      const restored = await primeSession(storeRef.current);
-      if (restored?.store) update(() => restored.store!);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
-
-  // Every trip to the background quietly snapshots the roof to the account.
+  // Every trip to the background quietly snapshots the roof.
   useEffect(() => {
     if (!ready) return;
     const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'background') void backupIfSignedIn(storeRef.current);
+      if (s !== 'background') return;
+      void (async () => {
+        const snap = await buildSnapshot(storeRef.current);
+        await pushSnapshotToICloud(JSON.stringify(snap));
+      })();
     });
     return () => sub.remove();
   }, [ready]);
 
-  const cloudSignIn = useCallback(async () => {
-    const { user, restored, store: merged } = await signInAndReconcile(storeRef.current);
-    setCloudUser(user);
-    if (merged) update(() => merged);
-    return restored ? { mindKeys: restored.mindKeys, shape: restored.shape } : null;
-  }, [update]);
-
-  const cloudSignOut = useCallback(async () => {
-    await signOut();
-    setCloudUser(null);
-  }, []);
-
   const cloudBackupNow = useCallback(async () => {
-    try {
-      await pushBackup(storeRef.current);
-      return true;
-    } catch {
-      return false;
-    }
+    const snap = await buildSnapshot(storeRef.current);
+    return pushSnapshotToICloud(JSON.stringify(snap));
   }, []);
 
   const cloudRestore = useCallback(async () => {
-    const r = await pullBackup(storeRef.current);
-    if (!r) return null;
+    const raw = await pullSnapshotFromICloud();
+    if (!raw) return null;
+    const r = await applySnapshot(raw, storeRef.current);
     if (r.store) update(() => r.store!);
     return { mindKeys: r.mindKeys, shape: r.shape };
   }, [update]);
@@ -560,9 +530,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         importStore,
         resetAll,
         syncNow,
-        cloudUser,
-        cloudSignIn,
-        cloudSignOut,
         cloudBackupNow,
         cloudRestore,
         restoreFromJson,

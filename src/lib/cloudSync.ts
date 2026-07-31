@@ -17,7 +17,10 @@ try {
   CloudStorage = null;
 }
 
+/** live store sync — union-merged on every change, so two devices converge */
 const FILE = '/hangtime-store.json';
+/** the central backup — a full snapshot of every room, written on background */
+const BACKUP_FILE = '/roof-backup.json';
 
 export type SyncState = 'unavailable' | 'idle' | 'syncing' | 'synced' | 'error';
 
@@ -46,6 +49,39 @@ export async function pullFromCloud(): Promise<Store | null> {
     if (!(await CloudStorage.exists(FILE))) return null;
     const raw = await CloudStorage.readFile(FILE);
     return migrate(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The central backup, in iCloud: one snapshot of the whole roof.
+ *
+ * Separate from the store sync above, and deliberately so — that one keeps two
+ * devices converged minute to minute, this one is what a fresh install reads to
+ * get everything back, mind included. Skips the write when nothing changed.
+ */
+let lastSnapshot: string | null = null;
+
+export async function pushSnapshotToICloud(snapshotJson: string): Promise<boolean> {
+  if (!CloudStorage) return false;
+  try {
+    if (!(await CloudStorage.isCloudAvailable())) return false;
+    if (snapshotJson === lastSnapshot) return true;
+    await CloudStorage.writeFile(BACKUP_FILE, snapshotJson);
+    lastSnapshot = snapshotJson;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function pullSnapshotFromICloud(): Promise<string | null> {
+  if (!CloudStorage) return null;
+  try {
+    if (!(await CloudStorage.isCloudAvailable())) return null;
+    if (!(await CloudStorage.exists(BACKUP_FILE))) return null;
+    return (await CloudStorage.readFile(BACKUP_FILE)) as string;
   } catch {
     return null;
   }
