@@ -28,6 +28,9 @@ Every prescription comes from published, outcome-proven methods (K Boges sub-max
 **Advise, never command.**
 Form cues are observations ("chin clears the bar"), never orders — enforced by a test that rejects "must", "should", and "!". Interrupted sessions are offered, not resumed. Readiness informs; it never blocks. Supplements are placed, never demanded — and skipping one is a first-class answer the app records without comment, not a gap it nags about. Mind mirrors; it never instructs.
 
+**Describe the day that happened, not the one that was planned.**
+A protocol written for a Tuesday is a lie on a Saturday. Nothing may assert a routine from the clock alone: what the app says about a dose comes from how it was actually taken, when, and what it landed near — and a dose that absorbs less is information, never a failure. There is always a version of the day that still works, and the copy has to say so. Enforced by a test that rejects "should", "must", "wrong", and "too late" in every generated line.
+
 **Measurement days stay honest.**
 Variations, autoregulation, and trims apply to volume and ladder days only. Max days and tests are always the standard movement at full prescription — otherwise the numbers driving the program start lying. `progressionExempt` means *not judged*.
 

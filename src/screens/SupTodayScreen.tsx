@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { nextStatus, nowWindow, statusOf, supDayFor } from '../engine/supplements';
-import type { SupplementItem, SupplementStatus } from '../engine/types';
+import { nextStatus, statusOf, supDayFor } from '../engine/supplements';
+import { absorptionNote, todayLine } from '../engine/absorption';
+import type { SupplementContext, SupplementItem, SupplementStatus } from '../engine/types';
 import { useStore } from '../hooks/useStore';
 import { MECH_COLOR, mono, modeIdentity, theme, type } from '../theme';
 import { RoofBar } from '../components/RoofBar';
@@ -9,6 +10,12 @@ import { ModeMark } from '../components/ModeMark';
 import { Sheet } from '../components/Sheet';
 import { SupplementFlash } from '../components/SupplementFlash';
 import { syncSupplementReminders } from '../lib/supplementNotifications';
+
+const CTX_LABEL: Record<SupplementContext, string> = {
+  empty: 'empty stomach',
+  food: 'with food',
+  fat: 'with fat',
+};
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -18,7 +25,7 @@ function todayLabel(): string {
 }
 
 export function SupTodayScreen() {
-  const { store, setSupplementStatus } = useStore();
+  const { store, setSupplementStatus, setSupplementContext } = useStore();
   const [viewing, setViewing] = useState<SupplementItem | null>(null);
   const [flash, setFlash] = useState<SupplementItem | null>(null);
 
@@ -36,7 +43,8 @@ export function SupTodayScreen() {
   const skippedCount = items.filter((i) => statusOf(day, i.id) === 'skipped').length;
   const answered = takenCount + skippedCount;
   const now = new Date();
-  const nowLine = nowWindow(now.getHours() + now.getMinutes() / 60);
+  // the day as it actually went, not as a weekday routine assumes it went
+  const nowLine = todayLine(items, day, now.getHours() + now.getMinutes() / 60);
 
   const viewingStatus = viewing ? statusOf(day, viewing.id) : null;
   const viewingStamp = viewing
@@ -47,7 +55,7 @@ export function SupTodayScreen() {
   // what it's doing in the body. Skipping and undoing pass quietly.
   const record = (item: SupplementItem, status: SupplementStatus | null) => {
     setSupplementStatus(item.id, status);
-    if (status === 'taken' && item.doing) setFlash(item);
+    if (status === 'taken') setFlash(item);
   };
 
   return (
@@ -64,7 +72,7 @@ export function SupTodayScreen() {
         </View>
 
         <View style={styles.nowCard}>
-          <Text style={styles.nowLabel}>RIGHT NOW</Text>
+          <Text style={styles.nowLabel}>TODAY SO FAR</Text>
           <Text style={styles.nowState}>{nowLine.state}</Text>
           <Text style={styles.nowWhy}>{nowLine.why}</Text>
         </View>
@@ -132,9 +140,11 @@ export function SupTodayScreen() {
 
       {flash ? (
         <SupplementFlash
-          name={flash.name}
-          doing={flash.doing ?? ''}
-          accent={MECH_COLOR[flash.mech]}
+          item={flash}
+          at={day.taken[flash.id] ?? ''}
+          day={day}
+          items={items}
+          onContext={(ctx: SupplementContext | null) => setSupplementContext(flash.id, ctx)}
           onDone={() => setFlash(null)}
         />
       ) : null}
@@ -146,13 +156,18 @@ export function SupTodayScreen() {
           title={viewing.name}
           subtitle={viewing.slot}
         >
-          {viewingStatus && viewing.doing ? (
+          {viewingStatus ? (
             <View style={[styles.doingCard, { borderLeftColor: MECH_COLOR[viewing.mech] }]}>
               <Text style={styles.doingText}>
-                {viewingStatus === 'taken' ? viewing.doing : 'Skipped today — no judgement, it just means today has no dose to read.'}
+                {viewingStatus === 'taken'
+                  ? absorptionNote(viewing, day.ctx?.[viewing.id] ?? null, viewingStamp ?? '', day, items).body
+                  : 'Skipped today — no judgement, it just means today has no dose to read.'}
               </Text>
               <Text style={[styles.doingStamp, mono]}>
                 {viewingStatus === 'taken' ? 'logged' : 'skipped'} {viewingStamp}
+                {viewingStatus === 'taken' && day.ctx?.[viewing.id]
+                  ? ` · ${CTX_LABEL[day.ctx[viewing.id]]}`
+                  : ''}
               </Text>
             </View>
           ) : null}

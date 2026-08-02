@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { computeReadiness, Modality } from '../engine/load';
-import { nowWindow, supDayFor } from '../engine/supplements';
+import { supDayFor } from '../engine/supplements';
+import { todayLine } from '../engine/absorption';
 import { workoutMode } from '../engine/activeWorkout';
 import { getEvents } from '../mind/lib/events';
 import { loadSettings as loadMindSettings } from '../mind/lib/settings';
@@ -74,7 +75,8 @@ export function RoofHomeScreen() {
     activeItems.some((i) => i.id === id)
   ).length;
   const now = new Date();
-  const nowLine = nowWindow(now.getHours() + now.getMinutes() / 60);
+  // read the log, not the clock — a weekend rarely follows the weekday shape
+  const nowLine = todayLine(activeItems, supDayFor(store.supDays ?? [], today), now.getHours() + now.getMinutes() / 60);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -178,7 +180,7 @@ export function RoofHomeScreen() {
             ? 'All logged today ✓'
             : `${takenToday} of ${activeItems.length} logged today`}
         </Text>
-        <Text style={styles.reason}>{nowLine.state}</Text>
+        <Text style={styles.reason}>{nowLine.why}</Text>
       </Pressable>
 
       <Text style={styles.footNote}>

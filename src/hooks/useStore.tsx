@@ -14,10 +14,11 @@ import {
   LoggedSession,
   Profile,
   Store,
+  SupplementContext,
   SupplementItem,
   SupplementStatus,
 } from '../engine/types';
-import { setStatus } from '../engine/supplements';
+import { setContext, setStatus } from '../engine/supplements';
 import { mergeRuns, Run } from '../engine/runs';
 import { initialState } from '../engine/generator';
 import { emptyStore, importJson, loadStore, saveStore, stamp } from '../lib/storage';
@@ -62,6 +63,8 @@ interface StoreApi {
   emptyPushTrash: () => void;
   /** record a supplement as taken or skipped today, or clear it with null */
   setSupplementStatus: (itemId: string, status: SupplementStatus | null) => void;
+  /** say how a dose went down — optional, and only for something already taken */
+  setSupplementContext: (itemId: string, context: SupplementContext | null) => void;
   /** add a new item or save edits to an existing one (matched by id) */
   saveSupItem: (item: SupplementItem) => void;
   /** archive keeps history attached; restore brings it back to the daily list */
@@ -359,6 +362,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [update]
   );
 
+  const setSupplementContext = useCallback(
+    (itemId: string, context: SupplementContext | null) => {
+      const today = new Date().toISOString().slice(0, 10);
+      update((s) => ({ ...s, supDays: setContext(s.supDays ?? [], today, itemId, context) }));
+    },
+    [update]
+  );
+
   const saveSupItem = useCallback(
     (item: SupplementItem) => {
       update((s) => {
@@ -544,6 +555,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         restorePushSession,
         emptyPushTrash,
         setSupplementStatus,
+        setSupplementContext,
         saveSupItem,
         setSupItemActive,
         importStore,

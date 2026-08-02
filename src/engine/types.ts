@@ -231,6 +231,9 @@ export interface SupplementItem {
 /** taken, deliberately skipped, or not answered yet */
 export type SupplementStatus = 'taken' | 'skipped';
 
+/** how a dose was actually taken — the thing that decides how much of it lands */
+export type SupplementContext = 'empty' | 'food' | 'fat';
+
 /** one calendar day of supplement logging: itemId → local time string ("14:05") */
 export interface SupplementDay {
   date: ISODate;
@@ -238,6 +241,8 @@ export interface SupplementDay {
   /** deliberately skipped today — different from simply not logged, and
    *  deliberately NOT counted as a dose anywhere */
   skipped?: Record<string, string>;
+  /** how each dose was actually taken, when it was said — optional always */
+  ctx?: Record<string, SupplementContext>;
 }
 
 export interface TestPoint {

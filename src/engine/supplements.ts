@@ -7,6 +7,7 @@ import type {
   SupplementDay,
   SupplementItem,
   SupplementKind,
+  SupplementContext,
   SupplementMech,
   SupplementStatus,
 } from './types';
@@ -198,8 +199,11 @@ export function setStatus(
   const day = supDayFor(days, date);
   const taken = { ...day.taken };
   const skipped = { ...(day.skipped ?? {}) };
+  const ctx = { ...(day.ctx ?? {}) };
   delete taken[itemId];
   delete skipped[itemId];
+  // how it was taken belongs to a dose; clearing or skipping drops it
+  if (status !== 'taken') delete ctx[itemId];
   if (status === 'taken') taken[itemId] = timeStr;
   if (status === 'skipped') skipped[itemId] = timeStr;
 
@@ -208,6 +212,26 @@ export function setStatus(
   if (empty) return rest;
   const next: SupplementDay = { date, taken };
   if (Object.keys(skipped).length > 0) next.skipped = skipped;
+  if (Object.keys(ctx).length > 0) next.ctx = ctx;
+  return [...rest, next].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Record how a dose went down. Only meaningful on something already taken. */
+export function setContext(
+  days: SupplementDay[],
+  date: ISODate,
+  itemId: string,
+  context: SupplementContext | null
+): SupplementDay[] {
+  const day = supDayFor(days, date);
+  if (!day.taken[itemId]) return days;
+  const ctx = { ...(day.ctx ?? {}) };
+  if (context === null) delete ctx[itemId];
+  else ctx[itemId] = context;
+  const rest = days.filter((d) => d.date !== date);
+  const next: SupplementDay = { date, taken: day.taken };
+  if (day.skipped && Object.keys(day.skipped).length > 0) next.skipped = day.skipped;
+  if (Object.keys(ctx).length > 0) next.ctx = ctx;
   return [...rest, next].sort((a, b) => a.date.localeCompare(b.date));
 }
 
