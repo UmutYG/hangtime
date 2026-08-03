@@ -12,7 +12,6 @@ import {
 import { colors, font, radius, spacing } from "../lib/theme";
 import { useSettings } from "../lib/SettingsContext";
 import { PositiveEvent, updateEvent, deleteEvent } from "../lib/events";
-import { matchEventToVision } from "../lib/claude";
 import { DEFAULT_VISION_ID, defaultVisionCard } from "../lib/defaultVision";
 import { Field, PrimaryButton } from "./ui";
 
@@ -26,11 +25,9 @@ export function EditEventSheet({
 }) {
   const { t, lang, settings } = useSettings();
   const [text, setText] = useState("");
-  const [matching, setMatching] = useState(false);
 
   useEffect(() => {
     setText(event?.text ?? "");
-    setMatching(false);
   }, [event]);
 
   const matchedCard = event
@@ -51,32 +48,6 @@ export function EditEventSheet({
     await deleteEvent(event.id);
     onClose();
   }
-
-  async function rematch() {
-    const value = text.trim();
-    if (!event || !value || !settings.apiKey || settings.visionCards.length === 0)
-      return;
-    setMatching(true);
-    try {
-      // Persist any edit first so the match reflects the latest text.
-      await updateEvent(event.id, { text: value });
-      const m = await matchEventToVision(
-        settings.apiKey,
-        value,
-        settings.visionCards,
-        lang
-      );
-      await updateEvent(event.id, {
-        matchedCardId: m.cardId ?? DEFAULT_VISION_ID,
-        matchReason: m.reason,
-      });
-      onClose();
-    } catch {
-      setMatching(false);
-    }
-  }
-
-  const canRematch = !!settings.apiKey && settings.visionCards.length > 0;
 
   return (
     <Modal
@@ -104,17 +75,6 @@ export function EditEventSheet({
             <PrimaryButton title={t("edit.save")} onPress={save} />
 
             <View style={styles.actions}>
-              {canRematch &&
-                (matching ? (
-                  <View style={styles.rematchRow}>
-                    <ActivityIndicator size="small" color={colors.accent} />
-                    <Text style={styles.link}>{t("edit.rematching")}</Text>
-                  </View>
-                ) : (
-                  <Pressable onPress={rematch} hitSlop={8}>
-                    <Text style={styles.link}>{t("edit.rematch")}</Text>
-                  </Pressable>
-                ))}
               <View style={{ flex: 1 }} />
               <Pressable onPress={remove} hitSlop={8}>
                 <Text style={styles.delete}>{t("edit.delete")}</Text>

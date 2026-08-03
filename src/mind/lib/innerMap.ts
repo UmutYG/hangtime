@@ -1,13 +1,12 @@
 import { getVisionReflections } from "./visionReflections";
 import { getStrengthStore } from "./strengths";
-import { getReframes } from "./reframes";
 import { loadSettings } from "./settings";
 
 // The person's quiet mental map, composed for prompt injection only — never
 // surfaced. Every consumer already carries the "NEVER quote, reference or
 // hint at these directly" discipline in its prompt; this just widens what
 // the mirror knows beyond vision reflections: the strengths they've accepted
-// in themselves, and what tends to weigh on them (from the reframe ritual).
+// in themselves.
 // Hard-capped at ~12 short lines, each field trimmed, so the map costs a few
 // hundred tokens at most no matter how much the person has written.
 // English framing labels are fine — these lines are prompt-side only, and
@@ -64,20 +63,6 @@ export async function buildInnerNotes(): Promise<string[]> {
     }
   } catch {}
 
-  // 3. Importance patterns from the reframe ritual — what tends to loom
-  //    large for this person, in their own words.
-  try {
-    const reframes = await getReframes(3);
-    for (const r of reframes) {
-      if (r.importanceAnswer) {
-        notes.push(
-          `Has been weighing on them: "${trim(r.negative)}" — because: "${trim(r.importanceAnswer)}"`
-        );
-      } else if (r.takeaway) {
-        notes.push(`Came to see: "${trim(r.takeaway)}"`);
-      }
-    }
-  } catch {}
 
   return notes.slice(0, 12);
 }

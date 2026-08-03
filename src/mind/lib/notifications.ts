@@ -6,9 +6,8 @@ import { Lang } from "./i18n";
 import { dateKey, dateIndex, addDays } from "./dates";
 import { addEvent, updateEvent, getEvents, PositiveEvent } from "./events";
 import { loadSettings } from "./settings";
-import { generateHeartfeltReminders, matchEventToVision } from "./claude";
+import { generateHeartfeltReminders } from "./claude";
 import { buildInnerNotes } from "./innerMap";
-import { getReframes } from "./reframes";
 import { normalizeLines } from "./text";
 import { getVoicePack, fillMoment } from "./voicePack";
 
@@ -150,31 +149,6 @@ function shorten(sample: string): string {
   return sample.length > 80 ? sample.slice(0, 78) + "…" : sample;
 }
 
-// Fires instead of the momentum line when the freshest thing the person did
-// wasn't logging a positive — it was the reframe ritual, and it's recent
-// enough that they're likely still turning it over. A direct, warm callout
-// using their own words for what's weighing on them, not a comparison to
-// some other reaction — that register stays retired.
-const DWELL_LINES: Record<Lang, ((short: string) => string)[]> = {
-  tr: [
-    (s) => `“${s}”'i kaç kere daha düşüneceksin? Bırak artık, kim tutuyor seni?`,
-    (s) => `Hâlâ “${s}” mi kafanda dönüyor? Bırakabilirsin şu an — kim tutuyor seni?`,
-    (s) => `“${s}” demiştin. Onu bu kadar büyüten sensin, gerçeklik değil. Küçült biraz.`,
-    (s) => `“${s}”'i tekrar tekrar düşünmek onu büyütmekten başka bi' işe yaramıyor. Bırak gitsin.`,
-  ],
-  en: [
-    (s) => `How many more times are you gonna think about “${s}”? Let it go — who's stopping you?`,
-    (s) => `Still stuck on “${s}”? You can drop it right now — who's stopping you?`,
-    (s) => `You said “${s}”. You're the one making it this big, not reality. Shrink it a bit.`,
-    (s) => `Replaying “${s}” over and over isn't doing anything but making it bigger. Let it go.`,
-  ],
-};
-
-function dwellLine(lang: Lang, sample: string, dateStr: string): string {
-  const short = shorten(sample);
-  const pool = DWELL_LINES[lang];
-  return pool[dateIndex(dateStr, pool.length, "dwell")](short);
-}
 
 // Fires instead of the momentum line when the day is still completely
 // empty — a direct dare to log just one thing, no placeholder needed.
@@ -372,30 +346,11 @@ async function scheduleDailyRemindersNow(lang: Lang, apiKey: string): Promise<vo
     if (events.length > 0) mostRecentEventAt = events[0].createdAt;
   } catch {}
 
-  // The reframe ritual is the most honest "still stuck on this" signal the
-  // app gets. If it's the freshest thing the person did — fresher than any
-  // logged positive — and it's recent enough to still be live, the midday
-  // slot calls it out directly instead of the usual momentum line. Capped
-  // at 3 days so the app doesn't keep nagging about something they've since
-  // just moved on from without telling it.
-  let dwellSample: string | null = null;
-  try {
-    const [recent] = await getReframes(1);
-    if (
-      recent &&
-      recent.createdAt > mostRecentEventAt &&
-      Date.now() - recent.createdAt < 3 * 24 * 60 * 60 * 1000
-    ) {
-      dwellSample = recent.negative;
-    }
-  } catch {}
-
   const scheduleKey = [
     dateKey(),
     lang,
     todaysSample ?? "",
     yesterdaysSample ?? "",
-    dwellSample ?? "",
   ].join(" ");
   if (scheduleKey === lastScheduleKey) return;
 
@@ -445,13 +400,10 @@ async function scheduleDailyRemindersNow(lang: Lang, apiKey: string): Promise<vo
     midday.setHours(MIDDAY_HOUR, 0, 0, 0);
     if (midday > now) {
       const key = dateKey(midday);
-      // Today's midday check-in reads the actual day: still stuck on a
-      // recent negative wins (most honest signal), a logged positive gets
+      // Today's midday check-in reads the actual day: a logged positive gets
       // echoed back, an empty day gets a direct dare instead of silence.
       let body: string;
-      if (d === 0 && dwellSample) {
-        body = momentLine(pack.dwell, dwellLine, lang, dwellSample, key, "dwell");
-      } else if (d === 0 && todaysSample) {
+      if (d === 0 && todaysSample) {
         body = momentLine(pack.momentum, momentumLine, lang, todaysSample, key, "momentum");
       } else if (d === 0) {
         body = pickLine(pack.nudge, NUDGE_LINES[lang], key, "nudge");
@@ -590,12 +542,6 @@ export async function logCapturedText(text: string): Promise<void> {
   try {
     const s0 = await loadSettings();
     scheduleResurface(value, s0.language, s0.apiKey);
-    if (s0.apiKey && s0.visionCards.length > 0) {
-      const m = await matchEventToVision(s0.apiKey, value, s0.visionCards, s0.language);
-      if (m.cardId) {
-        await updateEvent(event.id, { matchedCardId: m.cardId, matchReason: m.reason });
-      }
-    }
   } catch {}
 }
 

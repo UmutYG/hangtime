@@ -7,7 +7,6 @@ import { useSettings } from "../lib/SettingsContext";
 import { getEvents, deleteEvents, PositiveEvent } from "../lib/events";
 import { dailyQuote } from "../lib/quotes";
 import { LogEventSheet } from "../components/LogEventSheet";
-import { ReframeSheet } from "../components/ReframeSheet";
 import { WeeklyRecap } from "../components/WeeklyRecap";
 import { DailyRecap } from "../components/DailyRecap";
 import { MirrorFeedSheet } from "../components/MirrorFeedSheet";
@@ -23,7 +22,6 @@ export default function PracticeScreen() {
   const { t, lang } = useSettings();
   const locale = lang === "tr" ? "tr-TR" : "en-US";
   const [logOpen, setLogOpen] = useState(false);
-  const [reframeOpen, setReframeOpen] = useState(false);
   const [recapOpen, setRecapOpen] = useState(false);
   const [dailyRecapOpen, setDailyRecapOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
@@ -166,17 +164,6 @@ export default function PracticeScreen() {
         visible={logOpen}
         onClose={() => {
           setLogOpen(false);
-          loadEvents();
-        }}
-        onNegative={() => {
-          setLogOpen(false);
-          setReframeOpen(true);
-        }}
-      />
-      <ReframeSheet
-        visible={reframeOpen}
-        onClose={() => {
-          setReframeOpen(false);
           loadEvents();
         }}
       />

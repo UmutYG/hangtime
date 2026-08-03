@@ -15,28 +15,23 @@ import * as Haptics from "expo-haptics";
 import { colors, cardTints, font, radius, spacing } from "../lib/theme";
 import { useSettings } from "../lib/SettingsContext";
 import { dateKey } from "../lib/dates";
-import { addEvent, updateEvent, PositiveEvent } from "../lib/events";
+import { addEvent, PositiveEvent } from "../lib/events";
 import { scheduleResurface } from "../lib/notifications";
-import { matchEventToVision } from "../lib/claude";
-import { getStrengthStore } from "../lib/strengths";
 import { Field, PrimaryButton } from "./ui";
 
-// The moment of logging carries meaning again (restored 2026-07-16 after a
-// brief amalgam-only period — seeing a generic "my world takes care of me"
-// for something that clearly matched a dream vision felt wrong): one AI call
-// decides whether the event is real evidence for a vision AND whether it's
-// living proof of one of the person's own named strengths. A vision match
-// shows that vision's card ("This is you."); no match falls back to the
-// rotating amalgam pool — never force-fit to a default card. A strength
-// match adds a reaffirmation line either way. No key → straight to amalgam,
-// zero wait.
+// Logging is instant and offline. It used to make an AI call here to match
+// the moment to a vision and reaffirm a strength, which meant a wait at the
+// one moment that should cost nothing — removed 2026-08-02 at the user's
+// request. The daily recap still groups the day's moments into visions, and
+// it always derived that itself rather than reading per-event matches, so
+// nothing downstream lost anything.
 //
 // Decluttered 2026-07-21: the screen no longer echoes the user's own just-
 // typed words back (they know what they wrote), and the old random reassure
 // line was replaced by ONE fixed instruction (event.feelPrompt) directing
 // them to find the feeling and hold it gently — the single thing this
 // screen actually asks of the person, styled to be read, not skimmed.
-type Phase = "input" | "matching" | "affirmed";
+type Phase = "input" | "affirmed";
 
 const AMALGAM_COUNT = 6;
 // ~1s longer than the original 1.8s — Ahsen's request: the extra beat gives
@@ -108,21 +103,15 @@ function HoldToFeelButton({ label, onDone }: { label: string; onDone: () => void
 export function LogEventSheet({
   visible,
   onClose,
-  onNegative,
 }: {
   visible: boolean;
   onClose: () => void;
-  onNegative?: () => void;
 }) {
   const { t, lang, settings } = useSettings();
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>("input");
-  // cardLine: the big line in the tinted card — a matched vision's text, or
-  // an amalgam. kicker: "This is you." only for a real vision match.
+  // cardLine: the big line in the tinted card — one of the amalgam phrases.
   const [cardLine, setCardLine] = useState("");
-  const [kicker, setKicker] = useState("");
-  const [reason, setReason] = useState("");
-  const [strengthLine, setStrengthLine] = useState("");
   const [tint, setTint] = useState(cardTints[0]);
   const reveal = useRef(new Animated.Value(0)).current;
   const feelFade = useRef(new Animated.Value(0)).current;
@@ -155,27 +144,15 @@ export function LogEventSheet({
   function close() {
     setText("");
     setPhase("input");
-    setStrengthLine("");
-    setReason("");
     onClose();
   }
 
-  function goNegative() {
-    setText("");
-    setPhase("input");
-    setStrengthLine("");
-    setReason("");
-    onNegative?.();
-  }
-
-  // No-match / no-key / error landing: the rotating amalgam pool on a random
-  // Vision-palette tint. A strength reaffirmation still shows if one landed.
-  function settleAmalgam(strength: string) {
-    setKicker("");
-    setReason("");
+  // The landing: one of the rotating amalgam phrases on a random
+  // Vision-palette tint. Repeating a stance is the mechanism — the pool keeps
+  // it from going stale without making it a different thought every time.
+  function settleAmalgam() {
     setCardLine(t(`event.amalgam${1 + Math.floor(Math.random() * AMALGAM_COUNT)}`));
     setTint(cardTints[Math.floor(Math.random() * cardTints.length)]);
-    setStrengthLine(strength);
     setPhase("affirmed");
   }
 
@@ -191,41 +168,7 @@ export function LogEventSheet({
     await addEvent(event);
     // Gently re-surface it a while later so it lands instead of being forgotten.
     scheduleResurface(value, lang, settings.apiKey);
-
-    if (!settings.apiKey) {
-      settleAmalgam("");
-      return;
-    }
-
-    setPhase("matching");
-    try {
-      const strengths = await getStrengthStore()
-        .then((s) => s.strengths.map(({ id, text: st }) => ({ id, text: st })))
-        .catch(() => [] as { id: string; text: string }[]);
-      const m = await matchEventToVision(
-        settings.apiKey,
-        value,
-        settings.visionCards,
-        lang,
-        strengths
-      );
-      if (m.cardId) {
-        const card = settings.visionCards.find((c) => c.id === m.cardId);
-        if (card) {
-          await updateEvent(event.id, { matchedCardId: m.cardId, matchReason: m.reason });
-          setKicker(t("event.thisIsYou"));
-          setCardLine(card.text);
-          setTint(cardTints[card.tint % cardTints.length]);
-          setReason(m.reason);
-          setStrengthLine(m.strengthLine);
-          setPhase("affirmed");
-          return;
-        }
-      }
-      settleAmalgam(m.strengthLine);
-    } catch {
-      settleAmalgam("");
-    }
+    settleAmalgam();
   }
 
   const scale = reveal.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] });
@@ -250,36 +193,17 @@ export function LogEventSheet({
                 />
                 <View style={{ height: spacing.md }} />
                 <PrimaryButton title={t("event.save")} onPress={submit} />
-                {onNegative && (
-                  <Pressable onPress={goNegative} hitSlop={8} style={styles.negativeLink}>
-                    <Text style={styles.negativeTxt}>{t("practice.logNegative")}</Text>
-                  </Pressable>
-                )}
               </>
-            )}
-
-            {phase === "matching" && (
-              <View style={styles.center}>
-                <ActivityIndicator color={colors.accent} />
-                <Text style={styles.muted}>{t("event.matching")}</Text>
-              </View>
             )}
 
             {phase === "affirmed" && (
               <>
-                {!!kicker && <Text style={styles.thisIsYou}>{kicker}</Text>}
                 <Animated.View style={{ opacity: reveal, transform: [{ scale }] }}>
                   <View style={[styles.card, { backgroundColor: tint.bg }]}>
                     <Text style={[styles.cardText, { color: tint.fg }]}>{cardLine}</Text>
                   </View>
                 </Animated.View>
-                {!!reason && <Text style={styles.reason}>{reason}</Text>}
                 <Animated.View style={{ opacity: feelFade }}>
-                  {!!strengthLine && (
-                    <Text style={[styles.strengthLine, { color: tint.fg }]}>
-                      ✦ {strengthLine}
-                    </Text>
-                  )}
                   <Text style={styles.feelPrompt}>{t("event.feelPrompt")}</Text>
                 </Animated.View>
                 <View style={{ height: spacing.md }} />
