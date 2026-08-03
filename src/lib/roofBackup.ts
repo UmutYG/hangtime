@@ -25,7 +25,7 @@ export const MIND_KEYS = [
   'recapDoneV2',
   'mirrorFeed:v1',
   'mirrorThanks:v1',
-  'voicePack:v3',
+  'voicePack:v4',
   'whyQuestions:v1',
   'dissolveRatings:v1',
   'dissolveAskedWeek',

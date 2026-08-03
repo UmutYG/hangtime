@@ -9,7 +9,10 @@ import { normalizeLines } from "./text";
 // serving for up to a week after the update.
 // v3: resurface timing went random (2026-07-20) — cached v2 resurface lines
 // still say "a minute ago", which the new unpredictable delay makes untrue.
-const CACHE_KEY = "voicePack:v3";
+// v4: the pack shrank to echo + invites (2026-08-03) — a cached v3 entry
+// would otherwise keep a week's worth of lines written for notifications
+// that no longer fire.
+const CACHE_KEY = "voicePack:v4";
 const TTL = 7 * 24 * 60 * 60 * 1000; // refresh weekly, like every other pool
 
 // Minimum usable size per set — a set that comes back too thin (or, for the
@@ -18,21 +21,13 @@ const TTL = 7 * 24 * 60 * 60 * 1000; // refresh weekly, like every other pool
 // never takes the whole pack down.
 const MIN: Record<keyof VoicePack, number> = {
   echo: 3,
-  momentum: 3,
   invites: 4,
-  resurface: 2,
-  dwell: 3,
-  nudge: 3,
 };
-const NEEDS_PLACEHOLDER: (keyof VoicePack)[] = ["echo", "momentum", "resurface", "dwell"];
+const NEEDS_PLACEHOLDER: (keyof VoicePack)[] = ["echo"];
 
 const EMPTY: VoicePack = {
   echo: [],
-  momentum: [],
   invites: [],
-  resurface: [],
-  dwell: [],
-  nudge: [],
 };
 
 function validate(raw: Partial<VoicePack>): VoicePack {
@@ -73,8 +68,8 @@ export async function getVoicePack(lang: Lang, apiKey: string): Promise<VoicePac
 
   if (!apiKey) return EMPTY;
 
-  // Several consumers (notifications, log sheet, strengths) can all ask for
-  // the pack in the same session; a cache-miss week start should still cost
+  // The scheduler can be asked for the pack more than once in a session
+  // (mount, then a foreground); a cache-miss week start should still cost
   // exactly one generation.
   if (!inFlight) {
     inFlight = (async () => {

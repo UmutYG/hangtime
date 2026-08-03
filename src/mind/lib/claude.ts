@@ -557,20 +557,19 @@ export async function generateWhyQuestions(
 }
 
 // The weekly "voice pack": every micro-line the app speaks in passing —
-// post-log reassurances, the morning echo of yesterday, the midday momentum
-// nudge, evening invites, the randomly-timed resurface, and the Strengths
-// thank-yous — generated in ONE cheap call so nothing in the app ever reads
-// as a fixed script. Sets that wrap the person's own words carry a literal
-// {moment} placeholder the app fills at send time. Statics remain the
-// offline floor (voicePack.ts validates per set and falls back field by
-// field).
+// the morning echo of yesterday and the evening invite — generated in ONE
+// cheap call so nothing in the app ever reads as a fixed script. Sets that
+// wrap the person's own words carry a literal {moment} placeholder the app
+// fills at send time. Statics remain the offline floor (voicePack.ts
+// validates per set and falls back field by field).
+//
+// This used to carry four more sets (momentum, resurface, dwell, nudge) for
+// notifications that no longer exist — the day is a fixed morning/midday/
+// evening now, with nothing firing per log, so the pack only writes for the
+// two slots that still speak in the person's own words.
 export type VoicePack = {
   echo: string[]; // morning, wraps yesterday's moment — needs {moment}
-  momentum: string[]; // midday, wraps today's moment — needs {moment}
   invites: string[]; // evening "leave one thing here" notification
-  resurface: string[]; // a random while after logging, wraps the moment — needs {moment}
-  dwell: string[]; // still stuck on a recent negative — wraps it, needs {moment}
-  nudge: string[]; // day is still empty — dare them to log just one
 };
 
 export async function generateVoicePack(
@@ -602,12 +601,11 @@ export async function generateVoicePack(
     'TR: "3 saniye de olsa, o güzel hissi bir daha yaşasan ne olur?"\n' +
     'EN: "Something good happened today and you probably forgot it already. Didn\'t have to. Who\'s stopping you?"\n' +
     'EN: "Even three seconds — relive that good feeling, why not?"\n\n' +
-    "One intimate voice across all sets — a present friend, not a coach, " +
-    "but a friend with a spine: most lines simply hold space, but two sets " +
-    "below (dwell, nudge) get to call things out directly — a warm dare, " +
-    "not guilt-tripping, and never a comparison to some hypothetical worse " +
-    "reaction ('if it were bad you'd have told three people' — never that " +
-    "move, ever). Rhetorical 'who's stopping you' / 'kim tutuyor seni' " +
+    "One intimate voice across both sets — a present friend, not a coach, " +
+    "but a friend with a spine: the lines hold space rather than instruct, " +
+    "and never compare the person to some hypothetical worse reaction ('if " +
+    "it were bad you'd have told three people' — never that move, ever). " +
+    "Rhetorical 'who's stopping you' / 'kim tutuyor seni' " +
     "questions are welcome and encouraged where noted. No exclamation " +
     "marks; every line ends with real terminal punctuation; each under " +
     "~120 characters, no numbering, no surrounding quotes. Sets marked " +
@@ -618,28 +616,8 @@ export async function generateVoicePack(
     "Sets:\n" +
     "- echo (4): a morning line wrapping {moment} = something they noticed " +
     "YESTERDAY — the light of it is still theirs, today's is still unnamed.\n" +
-    "- momentum (4): a midday line wrapping {moment} = something they logged " +
-    "TODAY — feel it once more, no one is stopping them.\n" +
-    "- invites (5): an evening nudge to leave one small good thing from the " +
-    "day; warm, tiny, zero pressure; no placeholder.\n" +
-    "- resurface (5): arrives at a random, unguessable moment somewhere " +
-    "minutes to an hour after they logged {moment}. Sincere and disarming: " +
-    "gently assume they've probably already forgotten it and say that's " +
-    "genuinely ok — forgetting is the old reflex, and remembering right now " +
-    "is the whole change. Invite one more breath with it. NEVER claim how " +
-    "much time has passed (no 'a minute ago', no 'just now').\n" +
-    "- dwell (4): shown when they're still turning over something they " +
-    "recently called negative and haven't moved past it — wraps {moment} = " +
-    "their own words for what's weighing on them. A direct, warm dare: " +
-    "they're the one making it this heavy, not reality, and nothing is " +
-    "actually holding them there — so who's stopping them from dropping it, " +
-    "right now? Never dismissive of the feeling, only of holding it a " +
-    "moment longer than it needs.\n" +
-    "- nudge (5): shown when the day is still completely empty — they " +
-    "haven't logged a single good thing yet. Call the small friction out " +
-    "directly (they've been putting it off, they're being a little lazy " +
-    "about it) and dare them to drop just one thing right now to catch the " +
-    `momentum; playful and direct, never shaming; no placeholder.${notes}\n\n` +
+    "- invites (5): an evening line inviting them to leave one small good " +
+    `thing from the day; warm, tiny, zero pressure; no placeholder.${notes}\n\n` +
     `Write every line in ${language}.`;
 
   const res = await fetchWithTimeout(API_URL, {
@@ -662,20 +640,9 @@ export async function generateVoicePack(
             type: "object",
             properties: {
               echo: { type: "array", items: { type: "string" } },
-              momentum: { type: "array", items: { type: "string" } },
               invites: { type: "array", items: { type: "string" } },
-              resurface: { type: "array", items: { type: "string" } },
-              dwell: { type: "array", items: { type: "string" } },
-              nudge: { type: "array", items: { type: "string" } },
             },
-            required: [
-              "echo",
-              "momentum",
-              "invites",
-              "resurface",
-              "dwell",
-              "nudge",
-            ],
+            required: ["echo", "invites"],
             additionalProperties: false,
           },
         },
@@ -693,11 +660,7 @@ export async function generateVoicePack(
     Array.isArray(a) ? a.map((l: any) => String(l).trim()).filter(Boolean) : [];
   return {
     echo: clean(parsed.echo),
-    momentum: clean(parsed.momentum),
     invites: clean(parsed.invites),
-    resurface: clean(parsed.resurface),
-    dwell: clean(parsed.dwell),
-    nudge: clean(parsed.nudge),
   };
 }
 

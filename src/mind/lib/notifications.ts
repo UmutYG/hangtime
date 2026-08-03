@@ -4,8 +4,7 @@ import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Lang } from "./i18n";
 import { dateKey, dateIndex, addDays } from "./dates";
-import { addEvent, updateEvent, getEvents, PositiveEvent } from "./events";
-import { loadSettings } from "./settings";
+import { addEvent, getEvents, PositiveEvent } from "./events";
 import { generateHeartfeltReminders } from "./claude";
 import { buildInnerNotes } from "./innerMap";
 import { normalizeLines } from "./text";
@@ -88,33 +87,6 @@ const FALLBACK: Record<Lang, string[]> = {
   ],
 };
 
-// A same-day nudge tied to something the user already noticed — this is what
-// makes the app feel like it's living alongside them, not just pinging on a
-// timer. Several phrasings, picked deterministically per date so today always
-// shows the same one but tomorrow brings a different one.
-const MOMENTUM_LINES: Record<Lang, ((short: string) => string)[]> = {
-  tr: [
-    (s) => `“${s}” oldu bugün, sen çoktan unuttun bile. Unutmayadabilirdin — kim tutuyor seni tadını çıkarmaktan?`,
-    (s) => `“${s}” — 3 saniye de olsa bir daha yaşasan ne olur?`,
-    (s) => `Bugün “${s}” demiştin. Küçük görünüyor ama değildi — abartsan kimseye zararı yok.`,
-    (s) => `“${s}” — bugünün anıydı bu. İstersen şimdi bir daha yaşa, bedava.`,
-    (s) => `“${s}” oldu ve sen çoktan geçtin bile. Geri dön — kim tutuyor seni?`,
-  ],
-  en: [
-    (s) => `“${s}” happened today and you've probably already moved on. Didn't have to — who's stopping you from milking it a little?`,
-    (s) => `“${s}” — even three seconds, live it again?`,
-    (s) => `You said “${s}” today. Looked small, wasn't — go ahead and hype it up, no harm done.`,
-    (s) => `“${s}” — that was your moment today. Live it once more right now if you want. Free.`,
-    (s) => `“${s}” happened and you're already past it. Go back — who's stopping you?`,
-  ],
-};
-
-function momentumLine(lang: Lang, sample: string, dateStr: string): string {
-  const short = sample.length > 80 ? sample.slice(0, 78) + "…" : sample;
-  const pool = MOMENTUM_LINES[lang];
-  return pool[dateIndex(dateStr, pool.length, "momentum")](short);
-}
-
 // Morning echo of YESTERDAY's last noticed moment — the mirror remembering,
 // not the app counting. This replaced the streak/count fragments ("day 3 in
 // a row"): scorekeeping inflates importance and reads as a chore app, while
@@ -147,33 +119,6 @@ function echoLine(lang: Lang, sample: string, dateStr: string): string {
 // either way.
 function shorten(sample: string): string {
   return sample.length > 80 ? sample.slice(0, 78) + "…" : sample;
-}
-
-
-// Fires instead of the momentum line when the day is still completely
-// empty — a direct dare to log just one thing, no placeholder needed.
-const NUDGE_LINES: Record<Lang, string[]> = {
-  tr: [
-    "Bugün hâlâ bir şey yazmadın. Üşeniyorsun, tamam ama bir tane at gitsin.",
-    "Tek bir güzel şey. Sadece bir tane. Kim tutuyor seni?",
-    "Bugün hâlâ boş. Bir şey oldu mutlaka — küçük de olsa yaz.",
-    "Bir tane atmak otuz saniyeni alır, gerisini momentum hallediyor.",
-    "Bugün güzel bir şey oldu ama sen yazmaya üşendin. Şimdi bir tane, olur mu?",
-  ],
-  en: [
-    "Still haven't written anything today. You're being lazy, I get it — just drop one.",
-    "One good thing. Just one. Who's stopping you?",
-    "Still empty today. Something happened, I'm sure — write it, however small.",
-    "Writing one takes thirty seconds, momentum does the rest.",
-    "Something good happened today and you were too lazy to write it down. One, right now?",
-  ],
-};
-
-// Pick a no-placeholder line: the weekly voice pack set when valid, the
-// static pool otherwise. Same deterministic per-date pick as momentLine.
-function pickLine(packPool: string[], staticPool: string[], dateStr: string, salt: string): string {
-  const pool = packPool.length ? packPool : staticPool;
-  return pool[dateIndex(dateStr, pool.length, salt)];
 }
 
 function momentLine(
@@ -294,15 +239,21 @@ async function getHeartfeltLines(lang: Lang, apiKey: string): Promise<string[]> 
   return lines;
 }
 
-// Schedule a rolling week of warm reminders: a morning nudge, a midday touch,
-// and an evening "notice something good" invite (reply-able). Today's lines
-// stay personal without counting anything: the morning echoes YESTERDAY's
-// last noticed moment in the person's own words, the midday quotes what they
-// already logged TODAY — the mirror remembering, zero extra AI cost. The
-// rest fall back to a line picked by the actual calendar date (NOT by loop
-// position), so re-running this on every app open can't keep resetting
-// "today" back to the same pool entry. Re-runs on app open to refresh the
-// window and re-personalize today.
+// Schedule a rolling week of warm reminders — three fixed touches a day and
+// nothing else: a morning mirror, a midday reminder to look at what's
+// already good, and an evening invite to leave one thing here (reply-able).
+// Today's morning stays personal without counting anything: it echoes
+// YESTERDAY's last noticed moment in the person's own words — the mirror
+// remembering, zero extra AI cost. Every other slot takes a line picked by
+// the actual calendar date (NOT by loop position), so re-running this on
+// every app open can't keep resetting "today" back to the same pool entry.
+// Re-runs on app open to refresh the window.
+//
+// What deliberately ISN'T here: anything that fires because of what the
+// person did or didn't do. A log used to buy a second ping later that day,
+// and an empty afternoon used to buy a dare to fill it. Both turned the
+// mirror into something that chases — the day is three quiet touches now,
+// the same three whether the person logs ten things or nothing at all.
 //
 // App.tsx calls this both on mount and on every foreground transition, so
 // two calls can land close together (e.g. a quick background/foreground
@@ -332,43 +283,28 @@ let lastScheduleKey: string | null = null;
 async function scheduleDailyRemindersNow(lang: Lang, apiKey: string): Promise<void> {
   const now = new Date();
 
-  let todaysSample: string | null = null;
   let yesterdaysSample: string | null = null;
-  let mostRecentEventAt = 0;
   try {
     const events = await getEvents(); // newest first
-    const today = dateKey();
-    const todays = events.filter((e) => e.date === today);
-    if (todays.length > 0) todaysSample = todays[0].text; // most recent of today
-    const yesterday = addDays(today, -1);
+    const yesterday = addDays(dateKey(), -1);
     const yest = events.filter((e) => e.date === yesterday);
     if (yest.length > 0) yesterdaysSample = yest[0].text; // last noticed yesterday
-    if (events.length > 0) mostRecentEventAt = events[0].createdAt;
   } catch {}
 
-  const scheduleKey = [
-    dateKey(),
-    lang,
-    todaysSample ?? "",
-    yesterdaysSample ?? "",
-  ].join(" ");
+  const scheduleKey = [dateKey(), lang, yesterdaysSample ?? ""].join(" ");
   if (scheduleKey === lastScheduleKey) return;
 
-  // Cancel only the daily window — a pending resurface must survive this.
-  // With its old fixed 75-second delay a resurface practically never
-  // overlapped a reschedule; now that it can sit up to ~45 minutes out, a
-  // quick background/foreground would silently eat it.
-  //
-  // Inside Roof this must also leave OTHER rooms alone: supplements schedule
-  // their own reminders, and a blanket cancel here would quietly delete them
-  // on every foreground. Untagged notifications are this module's own from
-  // before rooms existed, so those still go.
+  // Cancel the whole mind window and rebuild it. This must leave OTHER rooms
+  // alone: supplements schedule their own reminders, and a blanket cancel
+  // here would quietly delete them on every foreground. Untagged
+  // notifications are this module's own from before rooms existed, so those
+  // still go — which is also how a resurface left over from a previous
+  // version finally clears itself out.
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
     scheduled
       .filter((n) => {
-        const data = (n.content?.data ?? {}) as { kind?: string; room?: string };
-        if (data.kind === "resurface") return false;
+        const data = (n.content?.data ?? {}) as { room?: string };
         return data.room === undefined || data.room === "mind";
       })
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier))
@@ -400,16 +336,10 @@ async function scheduleDailyRemindersNow(lang: Lang, apiKey: string): Promise<vo
     midday.setHours(MIDDAY_HOUR, 0, 0, 0);
     if (midday > now) {
       const key = dateKey(midday);
-      // Today's midday check-in reads the actual day: a logged positive gets
-      // echoed back, an empty day gets a direct dare instead of silence.
-      let body: string;
-      if (d === 0 && todaysSample) {
-        body = momentLine(pack.momentum, momentumLine, lang, todaysSample, key, "momentum");
-      } else if (d === 0) {
-        body = pickLine(pack.nudge, NUDGE_LINES[lang], key, "nudge");
-      } else {
-        body = lines[dateIndex(key, lines.length, "pm")];
-      }
+      // Deliberately impersonal: the same line whether the day is full or
+      // empty. It points at what's already good, it doesn't check up on
+      // anyone.
+      const body = lines[dateIndex(key, lines.length, "pm")];
       await Notifications.scheduleNotificationAsync({
         content: { title: APP_TITLE, body, data: { room: "mind" } },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: midday },
@@ -448,85 +378,10 @@ export async function ensureNotifications(lang: Lang, apiKey: string): Promise<b
   return granted;
 }
 
-// The resurface voice went sincere (2026-07-20): the old fixed 75-second
-// timing had trained the brain to expect — and tune out — the ping, and the
-// old lines assumed "a minute ago", which the random timing below makes
-// untrue. These openly assume the moment has probably been forgotten and say
-// that's ok — forgetting is the old reflex, noticing again is the change.
-// None of them claim how much time has passed.
-const RESURFACE_LINES: Record<Lang, ((short: string) => string)[]> = {
-  tr: [
-    (s) => `“${s}” — büyük ihtimalle çoktan unuttun, biliyorum. Sorun değil; unutmak eski alışkanlık. Şimdi hatırladın ya, mesele o.`,
-    (s) => `“${s}” vardı ya? Bugün oldu bu. Hiçbir şey değilmiş gibi geçip gitti — dön, birkaç saniye daha tut.`,
-    (s) => `Küçük bir kontrol: “${s}”. Hâlâ aklında mıydı, uçmuş muydu? İkisi de olur — şu an baktın ya, o yeter.`,
-    (s) => `“${s}” şimdiden solduysa dert etme. Değiştirdiğimiz refleks tam da bu — bir kez daha hisset, acele etmeden.`,
-    (s) => `Durduk yere geldim, biliyorum: “${s}”. Güzel şeyler ikinci bakışı hak ediyor, o kadar.`,
-    (s) => `“${s}” yazdın, geçtin gittin. Normal. Ama hâlâ senin — bir nefeslik geri al.`,
-  ],
-  en: [
-    (s) => `“${s}” — you've probably forgotten this by now, I know. It's ok; forgetting is the old habit. You just remembered — that's the whole point.`,
-    (s) => `Remember “${s}”? That was today. It slid by like nothing — go back and hold it a few more seconds.`,
-    (s) => `Small check-in: “${s}”. Still with you, or already gone? Either is fine — you just looked, and that's enough.`,
-    (s) => `If “${s}” has already faded, don't sweat it. That's exactly the reflex we're changing — feel it once more, no rush.`,
-    (s) => `Showing up out of nowhere, I know: “${s}”. Good things deserve a second look, that's all.`,
-    (s) => `You wrote “${s}” and moved on. Fair. But it's still yours — take it back for a breath.`,
-  ],
-};
-
-// The moment of arrival is deliberately unguessable: log-uniform between
-// ~2 and ~45 minutes, so short waits stay common but long ones stretch the
-// tail. The old fixed 75 seconds had become a pattern the brain memorised
-// and stopped reading — surprise is what makes the reminder land again.
-// Clamped so a late-evening log can't fire past ~23:00; if the day is
-// nearly over it falls back to a short 2–8 minute window.
-function resurfaceDelaySeconds(now = new Date()): number {
-  const MIN_S = 120;
-  const MAX_S = 45 * 60;
-  const cutoff = new Date(now);
-  cutoff.setHours(23, 0, 0, 0);
-  const untilCutoff = Math.floor((cutoff.getTime() - now.getTime()) / 1000);
-  if (untilCutoff <= MIN_S * 2) {
-    return 120 + Math.floor(Math.random() * 360); // 2–8 min, whenever it's this late
-  }
-  const max = Math.min(MAX_S, untilCutoff);
-  const r = Math.exp(Math.log(MIN_S) + Math.random() * (Math.log(max) - Math.log(MIN_S)));
-  return Math.round(r);
-}
-
-// Re-surface a just-logged positive later the same day, at a random moment,
-// so it actually lands instead of being forgotten in 5 seconds. Line picked
-// at random each time — this fires once per event, not once per day, so
-// date-based repetition isn't a concern here.
-export async function scheduleResurface(
-  text: string,
-  lang: Lang,
-  apiKey = ""
-): Promise<void> {
-  const clean = text.trim();
-  if (!clean) return;
-  const granted = await requestPermissions();
-  if (!granted) return;
-  const short = clean.length > 90 ? clean.slice(0, 88) + "…" : clean;
-  // Weekly voice pack when available (cache read — cheap even at log time),
-  // static template pool as the floor.
-  const pack = await getVoicePack(lang, apiKey).catch(() => null);
-  const body = pack?.resurface.length
-    ? fillMoment(pack.resurface[Math.floor(Math.random() * pack.resurface.length)], short)
-    : RESURFACE_LINES[lang][Math.floor(Math.random() * RESURFACE_LINES[lang].length)](short);
-  await Notifications.scheduleNotificationAsync({
-    // `kind` marks this so the daily rescheduler's cleanup spares it.
-    content: { title: APP_TITLE, body, data: { kind: "resurface", room: "mind" } },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: resurfaceDelaySeconds(),
-    },
-  });
-}
-
 // Shared landing for any text captured outside the normal LogEventSheet flow
-// (a notification reply, a Siri capture drained on foreground) — logs it,
-// schedules the resurface, and best-effort tags a real vision match. Never
-// force-fits a default card.
+// (a notification reply, a Siri capture drained on foreground) — it just
+// lands the event. Capturing something is the whole transaction; it doesn't
+// buy a follow-up ping.
 export async function logCapturedText(text: string): Promise<void> {
   const value = text.trim();
   if (!value) return;
@@ -538,11 +393,6 @@ export async function logCapturedText(text: string): Promise<void> {
     createdAt: Date.now(),
   };
   await addEvent(event);
-
-  try {
-    const s0 = await loadSettings();
-    scheduleResurface(value, s0.language, s0.apiKey);
-  } catch {}
 }
 
 // Called when the user replies to an evening "notice something good" prompt.

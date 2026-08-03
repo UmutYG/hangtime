@@ -6,7 +6,6 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   Animated,
   Easing,
   Pressable,
@@ -16,7 +15,6 @@ import { colors, cardTints, font, radius, spacing } from "../lib/theme";
 import { useSettings } from "../lib/SettingsContext";
 import { dateKey } from "../lib/dates";
 import { addEvent, PositiveEvent } from "../lib/events";
-import { scheduleResurface } from "../lib/notifications";
 import { Field, PrimaryButton } from "./ui";
 
 // Logging is instant and offline. It used to make an AI call here to match
@@ -107,7 +105,7 @@ export function LogEventSheet({
   visible: boolean;
   onClose: () => void;
 }) {
-  const { t, lang, settings } = useSettings();
+  const { t } = useSettings();
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>("input");
   // cardLine: the big line in the tinted card — one of the amalgam phrases.
@@ -166,8 +164,6 @@ export function LogEventSheet({
       createdAt: Date.now(),
     };
     await addEvent(event);
-    // Gently re-surface it a while later so it lands instead of being forgotten.
-    scheduleResurface(value, lang, settings.apiKey);
     settleAmalgam();
   }
 

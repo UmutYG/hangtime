@@ -60,6 +60,8 @@ Roof is silent unless a room's purpose genuinely requires interrupting. Two do. 
 
 Nothing else may schedule anything, and the two that do obey the same rules: every notification is tagged with its room and a room may only ever cancel its own; reminders group by moment rather than firing per item; anything already answered — taken, skipped, logged — drops out of the rest of the day. They never count, score, or scold.
 
+**A room's day is a fixed shape, not a reaction.** Mind speaks three times — a morning mirror, a midday reminder that something is already good, an evening invite to leave one thing here — and that is the whole day whether ten things were logged or none. Nothing fires *because of* what the person did: an entry doesn't buy a follow-up ping, and an empty afternoon doesn't buy a dare to fill it. A mirror that chases is no longer a mirror.
+
 ## The point
 
 Rep counts, doses, and logged signs are scaffolding. Roof exists so its owner can tend the areas of a life he is actually living — reflect, and evolve. Not to supervise him, and not to become somewhere he spends time.
