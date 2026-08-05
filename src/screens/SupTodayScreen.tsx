@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { nextStatus, statusOf, supDayFor } from '../engine/supplements';
+import { addDays, nextStatus, slotTimeGuess, statusOf, supDayFor } from '../engine/supplements';
 import { absorptionNote, todayLine } from '../engine/absorption';
 import type { SupplementContext, SupplementItem, SupplementStatus } from '../engine/types';
 import { useStore } from '../hooks/useStore';
+import { useSpaceTabs } from '../hooks/useNav';
 import { MECH_COLOR, mono, modeIdentity, theme, type } from '../theme';
 import { RoofBar } from '../components/RoofBar';
 import { ModeMark } from '../components/ModeMark';
 import { Sheet } from '../components/Sheet';
-import { SupplementFlash } from '../components/SupplementFlash';
+import { LogDoseSheet } from '../components/LogDoseSheet';
+import { BackfillDoseSheet } from '../components/BackfillDoseSheet';
 import { syncSupplementReminders } from '../lib/supplementNotifications';
 
 const CTX_LABEL: Record<SupplementContext, string> = {
@@ -20,14 +22,34 @@ const CTX_LABEL: Record<SupplementContext, string> = {
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
-function todayLabel(): string {
-  return new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+
+/** "Today" / "Yesterday" / "Tue, Aug 5" — a date you can orient by at a glance. */
+function dayLabel(iso: string): string {
+  const today = todayIso();
+  if (iso === today) return 'Today';
+  if (iso === addDays(today, -1)) return 'Yesterday';
+  return new Date(iso + 'T12:00:00').toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function longDayLabel(iso: string): string {
+  return new Date(iso + 'T12:00:00').toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 export function SupTodayScreen() {
   const { store, setSupplementStatus, setSupplementContext } = useStore();
+  const tabs = useSpaceTabs();
+  const [dateIso, setDateIso] = useState<string>(todayIso());
   const [viewing, setViewing] = useState<SupplementItem | null>(null);
   const [flash, setFlash] = useState<SupplementItem | null>(null);
+  const [backfilling, setBackfilling] = useState<SupplementItem | null>(null);
 
   // Entering this room is the one place it's fair to ask for notification
   // permission — the reminders belong to what's on this screen. Everywhere
@@ -38,7 +60,9 @@ export function SupTodayScreen() {
   }, []);
 
   const items = (store.supItems ?? []).filter((i) => i.active).sort((a, b) => a.order - b.order);
-  const day = supDayFor(store.supDays ?? [], todayIso());
+  const today = todayIso();
+  const isToday = dateIso === today;
+  const day = supDayFor(store.supDays ?? [], dateIso);
   const takenCount = items.filter((i) => statusOf(day, i.id) === 'taken').length;
   const skippedCount = items.filter((i) => statusOf(day, i.id) === 'skipped').length;
   const answered = takenCount + skippedCount;
@@ -51,10 +75,19 @@ export function SupTodayScreen() {
     ? (day.taken[viewing.id] ?? day.skipped?.[viewing.id])
     : undefined;
 
-  // Logging a dose is the one moment worth saying something: the flash shows
-  // what it's doing in the body. Skipping and undoing pass quietly.
+  /**
+   * Logging a dose is the one moment worth saying something, and what it's
+   * worth saying depends on when it happened. Today, the two-step sheet asks
+   * how it went down and then shows where it's headed. A day that's already
+   * gone can't be narrated live, so back-filling asks for the time instead —
+   * and never guesses one on its own.
+   */
   const record = (item: SupplementItem, status: SupplementStatus | null) => {
-    setSupplementStatus(item.id, status);
+    if (status === 'taken' && !isToday) {
+      setBackfilling(item);
+      return;
+    }
+    setSupplementStatus(item.id, status, dateIso);
     if (status === 'taken') setFlash(item);
   };
 
@@ -63,23 +96,56 @@ export function SupTodayScreen() {
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         <RoofBar />
         <View>
-          <Text style={styles.dateLabel}>{todayLabel()}</Text>
-          <Text style={type.hero}>Today</Text>
+          <Text style={styles.dateLabel}>{longDayLabel(dateIso)}</Text>
+          <Text style={type.hero}>{dayLabel(dateIso)}</Text>
         </View>
         <View style={styles.mottoRow}>
           <ModeMark mode="supplements" size={15} color={theme.supp} />
           <Text style={styles.mottoText}>{modeIdentity('supplements').motto}</Text>
         </View>
 
-        <View style={styles.nowCard}>
-          <Text style={styles.nowLabel}>TODAY SO FAR</Text>
-          <Text style={styles.nowState}>{nowLine.state}</Text>
-          <Text style={styles.nowWhy}>{nowLine.why}</Text>
+        {/* Days you can walk back through — a dose you forgot on Tuesday is
+            still a dose that happened, and the log should be able to say so. */}
+        <View style={styles.dayNav}>
+          <Pressable
+            onPress={() => setDateIso(addDays(dateIso, -1))}
+            hitSlop={10}
+            style={styles.navBtn}
+            accessibilityLabel="Previous day"
+          >
+            <Text style={styles.navArrow}>‹</Text>
+          </Pressable>
+          {isToday ? (
+            <Text style={styles.navToday}>{dayLabel(dateIso)}</Text>
+          ) : (
+            <Pressable onPress={() => setDateIso(today)} hitSlop={8}>
+              <Text style={[styles.navToday, styles.navBackToday]}>Back to today</Text>
+            </Pressable>
+          )}
+          <Pressable
+            onPress={() => !isToday && setDateIso(addDays(dateIso, 1))}
+            disabled={isToday}
+            hitSlop={10}
+            style={styles.navBtn}
+            accessibilityLabel="Next day"
+          >
+            <Text style={[styles.navArrow, isToday && styles.navArrowOff]}>›</Text>
+          </Pressable>
         </View>
+
+        {isToday ? (
+          <View style={styles.nowCard}>
+            <Text style={styles.nowLabel}>TODAY SO FAR</Text>
+            <Text style={styles.nowState}>{nowLine.state}</Text>
+            <Text style={styles.nowWhy}>{nowLine.why}</Text>
+          </View>
+        ) : null}
 
         <View style={styles.card}>
           <View style={styles.listHeader}>
-            <Text style={[type.kickerDim, { color: theme.supp }]}>TODAY</Text>
+            <Text style={[type.kickerDim, { color: theme.supp }]}>
+              {dayLabel(dateIso).toUpperCase()}
+            </Text>
             <Text style={[styles.countText, mono]}>
               {takenCount} of {items.length} taken
               {skippedCount > 0 ? ` · ${skippedCount} skipped` : ''}
@@ -111,7 +177,9 @@ export function SupTodayScreen() {
                     {status === 'taken' ? (
                       <Text style={[styles.stamp, mono]}>{stamp}</Text>
                     ) : status === 'skipped' ? (
-                      <Text style={styles.skippedText}>skipped today</Text>
+                      <Text style={styles.skippedText}>
+                        skipped {isToday ? 'today' : 'that day'}
+                      </Text>
                     ) : (
                       <Text style={styles.slot}>{it.slot}</Text>
                     )}
@@ -129,7 +197,9 @@ export function SupTodayScreen() {
         </View>
 
         {items.length > 0 && answered === items.length ? (
-          <Text style={styles.doneNote}>Every one answered today.</Text>
+          <Text style={styles.doneNote}>
+            Every one answered {isToday ? 'today' : 'that day'}.
+          </Text>
         ) : (
           <Text style={styles.footNote}>
             Tap the circle once for taken, twice to mark it skipped. No streaks — logged days are
@@ -139,13 +209,30 @@ export function SupTodayScreen() {
       </ScrollView>
 
       {flash ? (
-        <SupplementFlash
+        <LogDoseSheet
           item={flash}
           at={day.taken[flash.id] ?? ''}
           day={day}
           items={items}
-          onContext={(ctx: SupplementContext | null) => setSupplementContext(flash.id, ctx)}
+          onContext={(ctx: SupplementContext | null) =>
+            setSupplementContext(flash.id, ctx, dateIso)
+          }
           onDone={() => setFlash(null)}
+          onSeeLive={tabs ? () => tabs.setActive(1) : undefined}
+        />
+      ) : null}
+
+      {backfilling ? (
+        <BackfillDoseSheet
+          item={backfilling}
+          dateLabel={longDayLabel(dateIso)}
+          initialTime={slotTimeGuess(backfilling)}
+          onCancel={() => setBackfilling(null)}
+          onSave={(time, ctx) => {
+            setSupplementStatus(backfilling.id, 'taken', dateIso, time);
+            if (ctx) setSupplementContext(backfilling.id, ctx, dateIso);
+            setBackfilling(null);
+          }}
         />
       ) : null}
 
@@ -230,6 +317,20 @@ const styles = StyleSheet.create({
   dateLabel: { color: theme.textFaint, fontSize: 13, fontWeight: '500' },
   mottoRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -6 },
   mottoText: { color: theme.textFaint, fontSize: 12.5, fontWeight: '500', letterSpacing: 0.1 },
+  dayNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.cardMuted,
+    borderRadius: theme.radius,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  navBtn: { paddingHorizontal: 14, paddingVertical: 6 },
+  navArrow: { fontSize: 22, color: theme.textDim, lineHeight: 26 },
+  navArrowOff: { opacity: 0.22 },
+  navToday: { fontSize: 12.5, fontWeight: '600', color: theme.textDim },
+  navBackToday: { color: theme.supp },
   nowCard: {
     backgroundColor: theme.dark,
     borderRadius: theme.radiusLg,

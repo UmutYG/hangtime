@@ -10,6 +10,7 @@ import { AppState } from 'react-native';
 import { applyResult, replayAll } from '../engine/stateMachine';
 import { applyPushResult, initialPushState, replayPushAll } from '../engine/pushups';
 import {
+  ISODate,
   JointFeel,
   LoggedSession,
   Profile,
@@ -62,9 +63,19 @@ interface StoreApi {
   restorePushSession: (id: string) => void;
   emptyPushTrash: () => void;
   /** record a supplement as taken or skipped today, or clear it with null */
-  setSupplementStatus: (itemId: string, status: SupplementStatus | null) => void;
+  /** `date`/`at` default to now; pass them to fill in a dose you forgot to log */
+  setSupplementStatus: (
+    itemId: string,
+    status: SupplementStatus | null,
+    date?: ISODate,
+    at?: string
+  ) => void;
   /** say how a dose went down — optional, and only for something already taken */
-  setSupplementContext: (itemId: string, context: SupplementContext | null) => void;
+  setSupplementContext: (
+    itemId: string,
+    context: SupplementContext | null,
+    date?: ISODate
+  ) => void;
   /** add a new item or save edits to an existing one (matched by id) */
   saveSupItem: (item: SupplementItem) => void;
   /** archive keeps history attached; restore brings it back to the daily list */
@@ -350,22 +361,27 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     void syncSupplementReminders(store.supItems ?? [], store.supDays ?? []);
   }, [ready, store.supItems, store.supDays]);
 
+  // `date` and `at` are explicit so a forgotten dose can be filled in on the
+  // day it actually happened. Left off, both mean "now", which is the normal
+  // case; the back-fill flow asks for the time rather than assuming one, so
+  // the app never claims a clock reading nobody confirmed.
   const setSupplementStatus = useCallback(
-    (itemId: string, status: SupplementStatus | null) => {
-      const today = new Date().toISOString().slice(0, 10);
-      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    (itemId: string, status: SupplementStatus | null, date?: ISODate, at?: string) => {
+      const day = date ?? new Date().toISOString().slice(0, 10);
+      const time =
+        at ?? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
       update((s) => ({
         ...s,
-        supDays: setStatus(s.supDays ?? [], today, itemId, status, time),
+        supDays: setStatus(s.supDays ?? [], day, itemId, status, time),
       }));
     },
     [update]
   );
 
   const setSupplementContext = useCallback(
-    (itemId: string, context: SupplementContext | null) => {
-      const today = new Date().toISOString().slice(0, 10);
-      update((s) => ({ ...s, supDays: setContext(s.supDays ?? [], today, itemId, context) }));
+    (itemId: string, context: SupplementContext | null, date?: ISODate) => {
+      const day = date ?? new Date().toISOString().slice(0, 10);
+      update((s) => ({ ...s, supDays: setContext(s.supDays ?? [], day, itemId, context) }));
     },
     [update]
   );

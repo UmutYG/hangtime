@@ -254,10 +254,30 @@ export function countDays(
     .length;
 }
 
-function addDays(iso: ISODate, delta: number): ISODate {
+export function addDays(iso: ISODate, delta: number): ISODate {
   const d = new Date(iso + 'T12:00:00');
   d.setDate(d.getDate() + delta);
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * A starting guess for "what time did I take this?" when filling in a day
+ * that has already passed.
+ *
+ * A guess is all it is — the flow shows it in a picker and waits to be
+ * confirmed. Nothing here writes a time on its own, because a routine
+ * assumed from the clock is exactly the thing this room refuses to do.
+ */
+export function slotTimeGuess(item: SupplementItem): string {
+  if (item.remindAt) return item.remindAt;
+  const explicit = /(\d{1,2}):(\d{2})/.exec(item.slot ?? '');
+  if (explicit) return `${explicit[1].padStart(2, '0')}:${explicit[2]}`;
+  const s = (item.slot ?? '').toLowerCase();
+  if (/first meal|breakfast|morning/.test(s)) return '08:00';
+  if (/lunch|midday|noon/.test(s)) return '13:00';
+  if (/dinner|evening/.test(s)) return '19:00';
+  if (/bed|night/.test(s)) return '22:30';
+  return '12:00';
 }
 
 // ---------- physiology panels ----------

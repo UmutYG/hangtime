@@ -22,6 +22,24 @@ export function useNav(): NavApi {
   return api;
 }
 
+/**
+ * The tab slot inside whichever space is open.
+ *
+ * Separate from NavCtx because only tabbed spaces have one, and a screen that
+ * asks for it must survive being rendered outside a tab shell — hence the
+ * nullable hook rather than a throwing one.
+ */
+export interface TabApi {
+  active: number;
+  setActive: (index: number) => void;
+}
+
+export const TabCtx = createContext<TabApi | null>(null);
+
+export function useSpaceTabs(): TabApi | null {
+  return useContext(TabCtx);
+}
+
 /** where "up" leads from each view — training spaces live inside Body */
 export function parentOf(view: RoofView): RoofView {
   if (view === 'pullups' || view === 'pushups' || view === 'running') return 'body';

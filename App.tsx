@@ -5,7 +5,7 @@ import { BlurView } from 'expo-blur';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoreProvider, useStore } from './src/hooks/useStore';
 import { WorkoutProvider, useWorkout } from './src/hooks/useWorkout';
-import { NavCtx, parentOf, RoofView } from './src/hooks/useNav';
+import { NavCtx, TabCtx, parentOf, RoofView } from './src/hooks/useNav';
 import { RoofHomeScreen } from './src/screens/RoofHomeScreen';
 import { BodyAreaScreen } from './src/screens/BodyAreaScreen';
 import { MindShell } from './src/mind/MindShell';
@@ -94,10 +94,12 @@ function SpaceTabs({ space }: { space: TabbedMode }) {
   const { labels, screens } = MODE_TABS[space];
   const Screen = screens[active];
   return (
-    <View style={{ flex: 1, backgroundColor: modeIdentity(space).wash }}>
-      <Screen />
-      <TabBar labels={labels} active={active} accent={modeAccent(space)} onChange={setActive} />
-    </View>
+    <TabCtx.Provider value={{ active, setActive: (i: number) => setActive(i as Slot) }}>
+      <View style={{ flex: 1, backgroundColor: modeIdentity(space).wash }}>
+        <Screen />
+        <TabBar labels={labels} active={active} accent={modeAccent(space)} onChange={setActive} />
+      </View>
+    </TabCtx.Provider>
   );
 }
 
