@@ -42,3 +42,6 @@ yarn-error.*
 build/
 ios/Pods/
 ios/build/
+
+# Local copies of real app data pulled from iCloud (personal, never committed)
+.roof-data/

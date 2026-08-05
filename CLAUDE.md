@@ -7,9 +7,21 @@
 
 Adding a room = a new `AppMode`, a theme identity, a home card, and a shell. Never bolt a new life area onto an existing room.
 
-**Backup is central, not per-room.** `src/lib/roofBackup.ts` builds one snapshot (the store + every room's AsyncStorage keys); `src/lib/roofCloud.ts` pushes it to Supabase `user_backups` behind Sign in with Apple — the same project and row the standalone Slide app uses, which is how that data was migrated. A new room must add its keys to `MIND_KEYS`-style lists there rather than inventing its own cloud path. Two invariants: restores **merge** (never replace), and nothing pushes before it has pulled in that session, so an unseen backup can't be overwritten. Roof snapshots also mirror mind keys under `data` so the standalone Slide app can still read them.
+**Backup is central, not per-room.** `src/lib/roofBackup.ts` builds one snapshot (the store + every room's AsyncStorage keys); `src/lib/cloudSync.ts` pushes it to **iCloud** at `/roof-backup.json`, alongside the live store sync at `/hangtime-store.json`. There is no Supabase and no account — that was tried, the free-tier project was deleted out from under it, and the whole thing folded into iCloud (2026-08-02). A new room must add its keys to `MIND_KEYS` there rather than inventing its own cloud path. Two invariants: restores **merge** (never replace), and nothing pushes before it has pulled in that session, so an unseen backup can't be overwritten. Roof snapshots also mirror mind keys under `data` so the standalone Slide app can still read them.
 
 Visible brand name lives in exactly three places: `BRAND` in `src/theme.ts`, `name` in `app.json`, `CFBundleDisplayName` in `ios/Hangtime/Info.plist`. Bundle id, slug, repo name, iCloud container and AsyncStorage keys all still say `hangtime` **on purpose** — renaming them orphans TestFlight lineage and user data.
+
+# Looking at the real data
+
+To discuss how the algorithm is actually behaving, **don't ask the user to describe or type anything** — read the real store:
+
+```
+node scripts/snapshot.mjs
+```
+
+That container is the phone's own iCloud folder, mirrored onto this Mac automatically, so the data is already here — the app writes it on every trip to the background. If the digest looks stale, the only fix is for the user to open Roof and background it once. Never edit anything under `~/Library/Mobile Documents/` — that folder syncs straight back to the phone.
+
+The script copies the raw JSON to `.roof-data/` (gitignored) if you need fields the digest doesn't render. `roof-backup.json` in the same container also holds the **Mind** room's private entries — leave it alone unless the user asks, the training questions are all answered by the store.
 
 # Verifying changes
 
