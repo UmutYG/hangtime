@@ -96,7 +96,7 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
       setImportText('');
       say(describe(r));
     } catch {
-      const msg = "That didn't look like a Roof or Slide backup.";
+      const msg = "That didn't look like a backup from this app, or from Slide.";
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert('Import failed', msg);
     }

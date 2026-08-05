@@ -18,6 +18,13 @@ const CHIPS: { key: SupplementContext; label: string; hint: string }[] = [
   { key: 'fat', label: 'With fat', hint: 'oil, eggs, nuts, dairy' },
 ];
 
+function clampMin(n: number): number {
+  return n < 0 ? n + 1440 : n > 1439 ? n - 1440 : n;
+}
+function fmtMin(mins: number): string {
+  return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+}
+
 /**
  * The moment after logging a dose, in two beats.
  *
@@ -28,6 +35,11 @@ const CHIPS: { key: SupplementContext; label: string; hint: string }[] = [
  * Answering stays optional at every step — a rushed log still gets an honest
  * general answer. Nothing here grades the choice; a dose that lands slowly is
  * information, not a mistake.
+ *
+ * The timestamp is editable here too, not just when back-filling an older
+ * day: "took it this morning, logging it at lunch" is the normal case, and a
+ * log that can only ever say `now` quietly turns every late entry into a
+ * wrong one — which then feeds the absorption and journey answers.
  */
 export function LogDoseSheet({
   item,
@@ -35,6 +47,7 @@ export function LogDoseSheet({
   day,
   items,
   onContext,
+  onTime,
   onDone,
   onSeeLive,
 }: {
@@ -43,24 +56,38 @@ export function LogDoseSheet({
   day: SupplementDay;
   items: SupplementItem[];
   onContext: (ctx: SupplementContext | null) => void;
+  /** move the dose to another time on the same day */
+  onTime?: (time: string) => void;
   onDone: () => void;
   onSeeLive?: () => void;
 }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [ctx, setCtx] = useState<SupplementContext | null>(day.ctx?.[item.id] ?? null);
+  const [editingTime, setEditingTime] = useState(false);
+  const [mins, setMins] = useState<number>(() => parseClock(at) ?? 0);
   const fade = useRef(new Animated.Value(0)).current;
+
+  // The sheet owns the clock while it's open, so every downstream answer
+  // (absorption, journey position) reflects the corrected time immediately.
+  const atNow = onTime ? fmtMin(mins) : at;
+  const shiftTime = (delta: number) => {
+    const next = clampMin(mins + delta);
+    setMins(next);
+    onTime?.(fmtMin(next));
+  };
 
   const accent = MECH_COLOR[item.mech];
   const note = useMemo(
-    () => absorptionNote(item, ctx, at, day, items),
-    [item, ctx, at, day, items]
+    () => absorptionNote(item, ctx, atNow, day, items),
+    [item, ctx, atNow, day, items]
   );
   const phases = useMemo(() => journeyFor(item, ctx), [item, ctx]);
 
   // Where it is at the moment this sheet is open — usually phase one, but a
-  // dose logged a while after it was swallowed starts further along.
+  // dose taken hours ago and only logged now starts much further along, which
+  // is the whole reason the time is editable.
   const now = new Date();
-  const pos = positionAt(item, ctx, at, now.getHours() * 60 + now.getMinutes());
+  const pos = positionAt(item, ctx, atNow, now.getHours() * 60 + now.getMinutes());
   const current = pos?.phase ?? phases[0];
 
   const sites = useMemo(() => {
@@ -103,10 +130,35 @@ export function LogDoseSheet({
               <Text style={[styles.name, { color: accent }]} numberOfLines={1}>
                 {item.name}
               </Text>
-              <Text style={[styles.stamp, mono]}>
-                {mechName(item.mech)} · {at}
-              </Text>
+              {onTime && step === 1 ? (
+                <Pressable
+                  onPress={() => setEditingTime((v) => !v)}
+                  hitSlop={8}
+                  accessibilityLabel="Change the time"
+                >
+                  <Text style={[styles.stamp, mono]}>
+                    {mechName(item.mech)} ·{' '}
+                    <Text style={{ color: accent }}>
+                      {atNow} {editingTime ? '▾' : '✎'}
+                    </Text>
+                  </Text>
+                </Pressable>
+              ) : (
+                <Text style={[styles.stamp, mono]}>
+                  {mechName(item.mech)} · {atNow}
+                </Text>
+              )}
             </View>
+
+            {/* Only unfolds when asked — the common case is logging as you
+                take it, and that path shouldn't grow a control it never needs. */}
+            {onTime && step === 1 && editingTime ? (
+              <View style={styles.timeRow}>
+                <TimeStep label="hour" onUp={() => shiftTime(60)} onDown={() => shiftTime(-60)} />
+                <Text style={[styles.timeBig, mono]}>{atNow}</Text>
+                <TimeStep label="min" onUp={() => shiftTime(5)} onDown={() => shiftTime(-5)} />
+              </View>
+            ) : null}
 
             {step === 1 ? (
               <>
@@ -184,7 +236,51 @@ export function LogDoseSheet({
   );
 }
 
+function TimeStep({
+  label,
+  onUp,
+  onDown,
+}: {
+  label: string;
+  onUp: () => void;
+  onDown: () => void;
+}) {
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <Pressable onPress={onUp} hitSlop={10} style={styles.timeBtn} accessibilityLabel={`${label} up`}>
+        <Text style={styles.timeArrow}>▲</Text>
+      </Pressable>
+      <Text style={styles.timeLabel}>{label}</Text>
+      <Pressable
+        onPress={onDown}
+        hitSlop={10}
+        style={styles.timeBtn}
+        accessibilityLabel={`${label} down`}
+      >
+        <Text style={styles.timeArrow}>▼</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    paddingVertical: 4,
+  },
+  timeBig: { color: theme.onDark, fontSize: 30, fontWeight: '300', letterSpacing: 1 },
+  timeBtn: { paddingVertical: 3, paddingHorizontal: 8 },
+  timeArrow: { color: theme.onDark, opacity: 0.7, fontSize: 13 },
+  timeLabel: {
+    color: theme.onDark,
+    opacity: 0.35,
+    fontSize: 8.5,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(20,19,17,0.45)',

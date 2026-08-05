@@ -76,8 +76,8 @@ export default function SettingsScreen() {
         <Label>{tr ? "Yedekleme" : "Backup"}</Label>
         <Text style={styles.info}>
           {tr
-            ? "Burada değil: Roof tek bir yedek tutuyor ve bu alan da onun içinde. Roof ana ekranı → ⚙ → hesabına giriş yap."
-            : "Not here: Roof keeps one backup covering every room, this one included. Roof home → ⚙ → sign in to your account."}
+            ? "Burada değil: tek bir yedek var ve bu alan da onun içinde. Ana ekran → ⚙ → hesabına giriş yap."
+            : "Not here: there's one backup covering every room, this one included. Home → ⚙ → sign in to your account."}
         </Text>
       </Card>
 

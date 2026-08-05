@@ -217,6 +217,7 @@ export function SupTodayScreen() {
           onContext={(ctx: SupplementContext | null) =>
             setSupplementContext(flash.id, ctx, dateIso)
           }
+          onTime={(time) => setSupplementStatus(flash.id, 'taken', dateIso, time)}
           onDone={() => setFlash(null)}
           onSeeLive={tabs ? () => tabs.setActive(1) : undefined}
         />

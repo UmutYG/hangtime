@@ -8,17 +8,20 @@ import { getEvents } from '../mind/lib/events';
 import { loadSettings as loadMindSettings } from '../mind/lib/settings';
 import { useStore } from '../hooks/useStore';
 import { useWorkout } from '../hooks/useWorkout';
-import { useLoadEntries } from '../hooks/useReadiness';
+import { useJointFeel, useLoadEntries } from '../hooks/useReadiness';
 import { useNav } from '../hooks/useNav';
-import { BRAND, mono, theme, type } from '../theme';
+import { mono, theme, type } from '../theme';
 import { ModeMark } from '../components/ModeMark';
 import { SettingsSheet } from '../components/SettingsSheet';
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
-function todayLabel(): string {
-  return new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+function weekdayLabel(): string {
+  return new Date().toLocaleDateString(undefined, { weekday: 'long' });
+}
+function dayMonthLabel(): string {
+  return new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
 }
 
 /** The map of the life under this roof — one card per area, one glance each.
@@ -30,6 +33,7 @@ export function RoofHomeScreen() {
   const workout = useWorkout();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const entries = useLoadEntries();
+  const joints = useJointFeel();
   const today = todayIso();
 
   // ——— Body: the three training spaces compressed to one line each ———
@@ -41,9 +45,12 @@ export function RoofHomeScreen() {
     ];
     return spaces.map((s) => ({
       ...s,
-      score: computeReadiness(s.key, entries, today, store.externalReadiness ?? null).score,
+      // joints included — leaving them out made this card disagree with the
+      // space it opens into (44 here, 35 there, on a day with tender elbows)
+      score: computeReadiness(s.key, entries, today, store.externalReadiness ?? null, joints)
+        .score,
     }));
-  }, [entries, today, store.externalReadiness]);
+  }, [entries, today, store.externalReadiness, joints]);
   const minReadiness = Math.min(...bodyRows.map((r) => r.score));
   const trainedToday =
     (store.sessions.some((s) => s.date === today && s.dayKind !== 'custom') ? 1 : 0) +
@@ -80,16 +87,19 @@ export function RoofHomeScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      {/* The name of the app is not information. The date is: it's the one
+          thing on this screen that changes on its own, and it's what orients
+          you when you open it. So the date takes the hero and the branding
+          goes away entirely. */}
       <View style={styles.headerRow}>
         <View>
-          <Text style={styles.dateLabel}>{todayLabel()}</Text>
-          <Text style={type.hero}>{BRAND}</Text>
+          <Text style={styles.dateLabel}>{weekdayLabel()}</Text>
+          <Text style={type.hero}>{dayMonthLabel()}</Text>
         </View>
         <Pressable onPress={() => setSettingsOpen(true)} style={styles.gearBtn} hitSlop={10}>
           <Text style={styles.gearIcon}>⚙</Text>
         </Pressable>
       </View>
-      <Text style={styles.sub}>Everything you tend, under one roof.</Text>
 
       {/* ——— BODY ——— */}
       <Pressable onPress={() => go('body')} style={styles.card}>

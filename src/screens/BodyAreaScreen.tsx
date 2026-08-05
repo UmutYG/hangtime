@@ -7,7 +7,7 @@ import { runStats } from '../engine/runs';
 import { workoutMode } from '../engine/activeWorkout';
 import { useStore } from '../hooks/useStore';
 import { useWorkout } from '../hooks/useWorkout';
-import { useLoadEntries } from '../hooks/useReadiness';
+import { useJointFeel, useLoadEntries } from '../hooks/useReadiness';
 import { useNav } from '../hooks/useNav';
 import { AppMode, mono, theme, type } from '../theme';
 import { ModeMark } from '../components/ModeMark';
@@ -36,6 +36,7 @@ export function BodyAreaScreen() {
   const { go } = useNav();
   const workout = useWorkout();
   const entries = useLoadEntries();
+  const joints = useJointFeel();
   const today = todayIso();
   const week = weeklyLoad(entries, today);
   const runS = runStats(store.runs, today);
@@ -44,7 +45,15 @@ export function BodyAreaScreen() {
   const rows = useMemo(
     () =>
       TRAINING.map((m) => {
-        const readiness = computeReadiness(m.key, entries, today, store.externalReadiness ?? null);
+        // joints included, same as inside each space — an area page that
+        // disagrees with the room it opens is worse than no number at all
+        const readiness = computeReadiness(
+          m.key,
+          entries,
+          today,
+          store.externalReadiness ?? null,
+          joints
+        );
         let plan = '—';
         let done = false;
         if (m.key === 'pull') {
@@ -63,7 +72,7 @@ export function BodyAreaScreen() {
         }
         return { ...m, readiness, plan, done, load: week[m.key] };
       }),
-    [entries, today, store, runS.thisWeekKm, week]
+    [entries, today, store, runS.thisWeekKm, week, joints]
   );
 
   const maxLoad = Math.max(1, ...rows.map((r) => r.load));
