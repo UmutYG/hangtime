@@ -149,18 +149,6 @@ export function RoofHomeScreen() {
           </View>
           <Text style={[styles.scoreText, mono]}>{mindLine ? mindLine.signsToday : '—'}</Text>
         </View>
-        <Text style={styles.meta}>
-          {mindLine === null
-            ? ' '
-            : mindLine.signsToday > 0
-              ? `${mindLine.signsToday} sign${mindLine.signsToday === 1 ? '' : 's'} noticed today`
-              : 'No signs noticed yet today'}
-        </Text>
-        <Text style={styles.reason}>
-          {mindLine && mindLine.visions > 0
-            ? `${mindLine.visions} vision${mindLine.visions === 1 ? '' : 's'} on the wall`
-            : 'The vision wall is waiting'}
-        </Text>
       </Pressable>
 
       {/* ——— SUPPLEMENTS ——— */}
@@ -185,17 +173,7 @@ export function RoofHomeScreen() {
             ]}
           />
         </View>
-        <Text style={styles.meta}>
-          {takenToday === activeItems.length && activeItems.length > 0
-            ? 'All logged today ✓'
-            : `${takenToday} of ${activeItems.length} logged today`}
-        </Text>
-        <Text style={styles.reason}>{nowLine.why}</Text>
       </Pressable>
-
-      <Text style={styles.footNote}>
-        A new area of life becomes a new room here — nothing more, nothing sooner.
-      </Text>
 
       <SettingsSheet visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </ScrollView>

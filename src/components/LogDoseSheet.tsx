@@ -6,11 +6,9 @@ import {
   journeyFor,
   parseClock,
   positionAt,
-  type BodySite,
 } from '../engine/pharmacokinetics';
 import type { SupplementContext, SupplementDay, SupplementItem } from '../engine/types';
 import { MECH_COLOR, mono, theme } from '../theme';
-import { BodyFigure } from './BodyFigure';
 
 const CHIPS: { key: SupplementContext; label: string; hint: string }[] = [
   { key: 'empty', label: 'Empty stomach', hint: 'nothing eaten for a while' },
@@ -49,7 +47,6 @@ export function LogDoseSheet({
   onContext,
   onTime,
   onDone,
-  onSeeLive,
 }: {
   item: SupplementItem;
   at: string;
@@ -59,7 +56,6 @@ export function LogDoseSheet({
   /** move the dose to another time on the same day */
   onTime?: (time: string) => void;
   onDone: () => void;
-  onSeeLive?: () => void;
 }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [ctx, setCtx] = useState<SupplementContext | null>(day.ctx?.[item.id] ?? null);
@@ -90,12 +86,6 @@ export function LogDoseSheet({
   const pos = positionAt(item, ctx, atNow, now.getHours() * 60 + now.getMinutes());
   const current = pos?.phase ?? phases[0];
 
-  const sites = useMemo(() => {
-    const map: Partial<Record<BodySite, number>> = {};
-    for (const p of phases) map[p.site] = Math.max(map[p.site] ?? 0, 0.22);
-    map[current.site] = 1;
-    return map;
-  }, [phases, current]);
 
   useEffect(() => {
     Animated.timing(fade, {
@@ -196,34 +186,15 @@ export function LogDoseSheet({
               </>
             ) : (
               <>
-                <View style={styles.stage}>
-                  <BodyFigure
-                    active={sites}
-                    accent={accent}
-                    size={132}
-                    animate
-                  />
-                  <View style={styles.stageText}>
-                    <Text style={[styles.phaseLabel, { color: accent }]}>{current.label}</Text>
-                    <Text style={styles.siteLabel}>{SITE_LABEL[current.site]}</Text>
-                    <Text style={styles.phaseBody}>{current.body}</Text>
-                  </View>
+                <View style={styles.stageText}>
+                  <Text style={[styles.phaseLabel, { color: accent }]}>{current.label}</Text>
+                  <Text style={styles.siteLabel}>{SITE_LABEL[current.site]}</Text>
+                  <Text style={styles.phaseBody}>{current.body}</Text>
                 </View>
 
                 <Text style={styles.note}>{note.body}</Text>
                 {note.aside ? <Text style={styles.aside}>{note.aside}</Text> : null}
 
-                {onSeeLive ? (
-                  <Pressable
-                    style={[styles.primary, { backgroundColor: accent }]}
-                    onPress={() => {
-                      onDone();
-                      onSeeLive();
-                    }}
-                  >
-                    <Text style={styles.primaryText}>See it live in your body</Text>
-                  </Pressable>
-                ) : null}
                 <Pressable onPress={onDone} hitSlop={8}>
                   <Text style={styles.skip}>Done</Text>
                 </Pressable>
@@ -324,7 +295,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 6,
   },
-  stage: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   stageText: { flex: 1, gap: 3 },
   phaseLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' },
   siteLabel: { color: theme.onDark, fontSize: 15, fontWeight: '600' },

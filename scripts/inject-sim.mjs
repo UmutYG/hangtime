@@ -15,9 +15,10 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { safeCopy } from './lib/store.mjs';
 
 const UDID = process.env.ROOF_SIM_UDID ?? '028FB4DE-2CEA-4EEA-91A1-83D6CD9C5321';
 const BUNDLE = 'com.umutyg.hangtime';
@@ -54,11 +55,11 @@ function main() {
   const local = path.join(staged, 'inject-source.json');
   const cached = path.join(staged, 'hangtime-store.json');
   try {
-    copyFileSync(source, local);
+    safeCopy(source, local);
   } catch (err) {
     if (!existsSync(cached)) throw err;
     console.warn(`iCloud didn't respond (${err.code}) — using the cached copy instead.`);
-    copyFileSync(cached, local);
+    safeCopy(cached, local);
   }
 
   const raw = readFileSync(local, 'utf8');

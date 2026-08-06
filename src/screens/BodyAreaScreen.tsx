@@ -84,10 +84,6 @@ export function BodyAreaScreen() {
         <ModeMark mode="body" size={22} color={theme.accent} />
         <Text style={type.hero}>Body</Text>
       </View>
-      <Text style={styles.sub}>
-        One body, three spaces. Readiness sees everything you train — a hard pull day is not free
-        when push day comes around.
-      </Text>
 
       {rows.map((r) => (
         <Pressable key={r.key} onPress={() => go(r.mode)} style={styles.card}>

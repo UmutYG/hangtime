@@ -88,10 +88,6 @@ export function TodayScreen() {
           <Text style={type.hero}>Today</Text>
         </View>
       </View>
-      <View style={styles.mottoRow}>
-        <ModeMark mode="pullups" size={15} color={theme.accent} />
-        <Text style={styles.mottoText}>{modeIdentity('pullups').motto}</Text>
-      </View>
 
       {workout.pending && workoutMode(workout.pending) === 'pullups' ? (
         <ResumeCard
@@ -115,8 +111,7 @@ export function TodayScreen() {
           <Text style={styles.doneBody}>
             {lastDoneToday
               ? `${lastDoneToday.sets.filter((s) => !s.isWarmup).length} sets, ${lastDoneToday.sets.reduce((sum, s) => sum + s.actualReps, 0)} reps logged.`
-              : ''}{' '}
-            Your next session appears here tomorrow — the engine has already adjusted it.
+              : ''}
           </Text>
         </View>
       ) : (
@@ -200,8 +195,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: theme.pad, gap: 12, paddingBottom: 120 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  mottoRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -6 },
-  mottoText: { color: theme.textFaint, fontSize: 12.5, fontWeight: '500', letterSpacing: 0.1 },
   dateLabel: { color: theme.textFaint, fontSize: 13, fontWeight: '500' },
   card: {
     backgroundColor: theme.card,

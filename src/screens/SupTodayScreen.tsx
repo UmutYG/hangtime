@@ -4,7 +4,6 @@ import { addDays, nextStatus, slotTimeGuess, statusOf, supDayFor } from '../engi
 import { absorptionNote, todayLine } from '../engine/absorption';
 import type { SupplementContext, SupplementItem, SupplementStatus } from '../engine/types';
 import { useStore } from '../hooks/useStore';
-import { useSpaceTabs } from '../hooks/useNav';
 import { MECH_COLOR, mono, modeIdentity, theme, type } from '../theme';
 import { RoofBar } from '../components/RoofBar';
 import { ModeMark } from '../components/ModeMark';
@@ -45,7 +44,6 @@ function longDayLabel(iso: string): string {
 
 export function SupTodayScreen() {
   const { store, setSupplementStatus, setSupplementContext } = useStore();
-  const tabs = useSpaceTabs();
   const [dateIso, setDateIso] = useState<string>(todayIso());
   const [viewing, setViewing] = useState<SupplementItem | null>(null);
   const [flash, setFlash] = useState<SupplementItem | null>(null);
@@ -95,37 +93,33 @@ export function SupTodayScreen() {
     <View style={{ flex: 1 }}>
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         <RoofBar />
-        <View>
-          <Text style={styles.dateLabel}>{longDayLabel(dateIso)}</Text>
-          <Text style={type.hero}>{dayLabel(dateIso)}</Text>
-        </View>
-        <View style={styles.mottoRow}>
-          <ModeMark mode="supplements" size={15} color={theme.supp} />
-          <Text style={styles.mottoText}>{modeIdentity('supplements').motto}</Text>
-        </View>
 
-        {/* Days you can walk back through — a dose you forgot on Tuesday is
-            still a dose that happened, and the log should be able to say so. */}
+        {/* One element carries the whole header: which day you're looking at,
+            and the way to any other day. It used to be a date line, a hero, and
+            a separate nav strip all saying "Today". */}
         <View style={styles.dayNav}>
           <Pressable
             onPress={() => setDateIso(addDays(dateIso, -1))}
-            hitSlop={10}
+            hitSlop={12}
             style={styles.navBtn}
             accessibilityLabel="Previous day"
           >
             <Text style={styles.navArrow}>‹</Text>
           </Pressable>
-          {isToday ? (
-            <Text style={styles.navToday}>{dayLabel(dateIso)}</Text>
-          ) : (
-            <Pressable onPress={() => setDateIso(today)} hitSlop={8}>
-              <Text style={[styles.navToday, styles.navBackToday]}>Back to today</Text>
-            </Pressable>
-          )}
+          <Pressable
+            onPress={() => !isToday && setDateIso(today)}
+            disabled={isToday}
+            style={styles.navCentre}
+          >
+            <Text style={type.hero}>{dayLabel(dateIso)}</Text>
+            <Text style={styles.dateLabel}>
+              {isToday ? longDayLabel(dateIso) : 'tap to come back'}
+            </Text>
+          </Pressable>
           <Pressable
             onPress={() => !isToday && setDateIso(addDays(dateIso, 1))}
             disabled={isToday}
-            hitSlop={10}
+            hitSlop={12}
             style={styles.navBtn}
             accessibilityLabel="Next day"
           >
@@ -133,19 +127,8 @@ export function SupTodayScreen() {
           </Pressable>
         </View>
 
-        {isToday ? (
-          <View style={styles.nowCard}>
-            <Text style={styles.nowLabel}>TODAY SO FAR</Text>
-            <Text style={styles.nowState}>{nowLine.state}</Text>
-            <Text style={styles.nowWhy}>{nowLine.why}</Text>
-          </View>
-        ) : null}
-
         <View style={styles.card}>
           <View style={styles.listHeader}>
-            <Text style={[type.kickerDim, { color: theme.supp }]}>
-              {dayLabel(dateIso).toUpperCase()}
-            </Text>
             <Text style={[styles.countText, mono]}>
               {takenCount} of {items.length} taken
               {skippedCount > 0 ? ` · ${skippedCount} skipped` : ''}
@@ -196,16 +179,6 @@ export function SupTodayScreen() {
           ) : null}
         </View>
 
-        {items.length > 0 && answered === items.length ? (
-          <Text style={styles.doneNote}>
-            Every one answered {isToday ? 'today' : 'that day'}.
-          </Text>
-        ) : (
-          <Text style={styles.footNote}>
-            Tap the circle once for taken, twice to mark it skipped. No streaks — logged days are
-            context for reading your body, not a score to protect.
-          </Text>
-        )}
       </ScrollView>
 
       {flash ? (
@@ -219,7 +192,6 @@ export function SupTodayScreen() {
           }
           onTime={(time) => setSupplementStatus(flash.id, 'taken', dateIso, time)}
           onDone={() => setFlash(null)}
-          onSeeLive={tabs ? () => tabs.setActive(1) : undefined}
         />
       ) : null}
 
@@ -316,8 +288,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: theme.pad, gap: 12, paddingBottom: 120 },
   dateLabel: { color: theme.textFaint, fontSize: 13, fontWeight: '500' },
-  mottoRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -6 },
-  mottoText: { color: theme.textFaint, fontSize: 12.5, fontWeight: '500', letterSpacing: 0.1 },
   dayNav: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -328,6 +298,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   navBtn: { paddingHorizontal: 14, paddingVertical: 6 },
+  navCentre: { alignItems: 'center', flex: 1, gap: 1 },
   navArrow: { fontSize: 22, color: theme.textDim, lineHeight: 26 },
   navArrowOff: { opacity: 0.22 },
   navToday: { fontSize: 12.5, fontWeight: '600', color: theme.textDim },

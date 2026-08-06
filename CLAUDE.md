@@ -23,6 +23,14 @@ That container is the phone's own iCloud folder, mirrored onto this Mac automati
 
 The script copies the raw JSON to `.roof-data/` (gitignored) if you need fields the digest doesn't render. `roof-backup.json` in the same container also holds the **Mind** room's private entries — leave it alone unless the user asks, the training questions are all answered by the store.
 
+**Never `copyFileSync` straight out of that container.** It truncates the destination before it reads, and an evicted iCloud file can stall for a minute — which destroys the cached copy that the failure was supposed to fall back on. This has already happened once. Use `safeCopy`/`loadStore` from `scripts/lib/store.mjs`, which stages through a temp file and renames.
+
+# The Claude Desktop bridge
+
+`scripts/mcp-server.mjs` is an MCP server (registered in Claude Desktop as `roof`) exposing `get_supplements`, `get_training` and `get_raw_store`, read-only, from the same iCloud store.
+
+This exists because of a deliberate split the user asked for: **the app stays simple — it logs, reminds, and shows state — and anything worth actually thinking about happens in Claude with the real numbers.** That is why the supplements Body tab and its figure were deleted rather than improved. Before adding an analysis, explanation or insight screen to the app, assume the answer is that it belongs on this side of the bridge instead.
+
 # Verifying changes
 
 - Verify on the **iOS Simulator ONLY** (**iPhone 17**, udid `028FB4DE-2CEA-4EEA-91A1-83D6CD9C5321` — the user's standing test device since 2026-07-31; do not switch devices, the app stays installed there between sessions). **Never use localhost / the web preview for testing** — user instruction 2026-07-31. Boot with `xcrun simctl boot <udid>` if shutdown, then `attach` so the user can watch.

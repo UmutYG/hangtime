@@ -17,7 +17,6 @@ import { RunTrendsScreen } from './src/screens/RunTrendsScreen';
 import { PushTodayScreen } from './src/screens/PushTodayScreen';
 import { PushProgressScreen } from './src/screens/PushProgressScreen';
 import { SupTodayScreen } from './src/screens/SupTodayScreen';
-import { SupBodyScreen } from './src/screens/SupBodyScreen';
 import { SupStackScreen } from './src/screens/SupStackScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { WorkoutOverlay } from './src/components/WorkoutOverlay';
@@ -42,8 +41,8 @@ const MODE_TABS: Record<TabbedMode, { labels: string[]; screens: React.Component
     screens: [RunsHomeScreen, HistoryScreen, RunTrendsScreen],
   },
   supplements: {
-    labels: ['Today', 'Body', 'Stack'],
-    screens: [SupTodayScreen, SupBodyScreen, SupStackScreen],
+    labels: ['Today', 'Stack'],
+    screens: [SupTodayScreen, SupStackScreen],
   },
 };
 

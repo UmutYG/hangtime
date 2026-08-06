@@ -63,10 +63,6 @@ export function RunsHomeScreen() {
           <Text style={type.hero}>Runs</Text>
         </View>
       </View>
-      <View style={styles.mottoRow}>
-        <ModeMark mode="running" size={15} color={theme.run} />
-        <Text style={styles.mottoText}>{modeIdentity('running').motto}</Text>
-      </View>
 
       <ReadinessCard readiness={readinessInfo} accent={theme.run} />
 
@@ -164,8 +160,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: theme.pad, gap: 14, paddingBottom: 120 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  mottoRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -6 },
-  mottoText: { color: theme.textFaint, fontSize: 12.5, fontWeight: '500', letterSpacing: 0.1 },
   dateLabel: { color: theme.textFaint, fontSize: 13, fontWeight: '500' },
   card: {
     backgroundColor: theme.card,

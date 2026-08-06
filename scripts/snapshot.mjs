@@ -14,34 +14,10 @@
 // months from now without a build step, and it must never be something that
 // can break the app. It reads. That's all.
 
-import { existsSync, copyFileSync, readFileSync, mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
 import path from 'node:path';
+import { loadStore } from './lib/store.mjs';
 
-const CONTAINER = path.join(
-  homedir(),
-  'Library/Mobile Documents/iCloud~com~umutyg~hangtime'
-);
-const STORE = path.join(CONTAINER, 'hangtime-store.json');
 const OUT_DIR = path.join(import.meta.dirname, '..', '.roof-data');
-
-// Reading in place can block on iCloud materialising the file; copying out
-// first is instant and also leaves a stable artifact to diff against later.
-function loadStore() {
-  if (!existsSync(STORE)) {
-    console.error(
-      `No store at ${STORE}\n\n` +
-        `The file appears once the app has been to the background at least once\n` +
-        `on a device signed into this iCloud account. Open Roof, swipe up, wait a\n` +
-        `few seconds, then re-run.`
-    );
-    process.exit(1);
-  }
-  mkdirSync(OUT_DIR, { recursive: true });
-  const local = path.join(OUT_DIR, 'hangtime-store.json');
-  copyFileSync(STORE, local);
-  return { store: JSON.parse(readFileSync(local, 'utf8')), local };
-}
 
 const n = (x, d = 1) => (x == null ? '—' : Number(x).toFixed(d).replace(/\.0+$/, ''));
 const pct = (x) => (x == null ? '—' : `${Math.round(x * 100)}%`);
@@ -97,13 +73,20 @@ function tuneLine(t) {
 }
 
 function main() {
-  const { store: s, local } = loadStore();
+  let loaded;
+  try {
+    loaded = loadStore(OUT_DIR);
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+  const { store: s, path: local, source } = loaded;
   const L = [];
   const p = (x = '') => L.push(x);
 
   p(`ROOF SNAPSHOT`);
   p(`store written ${s.updatedAt} (${ago(s.updatedAt)}) · schema v${s.version}`);
-  p(`local copy: ${path.relative(process.cwd(), local)}`);
+  p(`read from ${source === 'icloud' ? 'iCloud' : 'the local cache — iCloud did not respond'} · ${path.relative(process.cwd(), local)}`);
   p();
 
   const pr = s.profile;

@@ -42,9 +42,13 @@ export function SupStackScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <RoofBar />
       <Text style={type.hero}>Stack</Text>
+      {/* The one place mechanics are spelled out. They used to sit permanently
+          under the daily list, where they were read once and then became
+          furniture; here they're a step away on the tab you already open when
+          you want to change how this room works. */}
       <Text style={styles.note}>
-        Every item, editable. Place a new one by asking which of the five mechanisms governs it —
-        the reference below is the guide.
+        On the daily list, tap a circle once for taken, twice for skipped. A skip is an answer,
+        not a gap — nothing here counts streaks.
       </Text>
 
       <View style={styles.card}>

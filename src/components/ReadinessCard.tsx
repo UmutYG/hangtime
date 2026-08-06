@@ -48,13 +48,10 @@ export function ReadinessCard({
           {r}
         </Text>
       ))}
-      {readiness.suggestion ? (
-        <Text style={[styles.suggestion, { color: accent }]}>
-          {readiness.suggestion === 'rough'
-            ? 'Your recent load is high. Worth easing off — the session is still yours to take.'
-            : 'Some fatigue in the system. Nothing alarming, just worth knowing.'}
-        </Text>
-      ) : null}
+      {/* The soft verdict that used to sit here ("nothing alarming, just worth
+          knowing") said nothing the score and the reasons above don't already
+          say. The reasons stay — they justify a number that changes training.
+          The commentary on top of them doesn't. */}
       {jointCheck ? (
         <View style={styles.jointWrap}>
           <JointCheck accent={accent} />
