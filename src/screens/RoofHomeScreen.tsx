@@ -128,16 +128,6 @@ export function RoofHomeScreen() {
             ? `${trainedToday} session${trainedToday === 1 ? '' : 's'} today ✓`
             : 'Nothing trained yet today'}
         </Text>
-        <View style={styles.miniRow}>
-          {bodyRows.map((r) => (
-            <View key={r.key} style={styles.miniItem}>
-              <View style={[styles.miniDot, { backgroundColor: r.color }]} />
-              <Text style={styles.miniText}>
-                {r.label} <Text style={mono}>{r.score}</Text>
-              </Text>
-            </View>
-          ))}
-        </View>
       </Pressable>
 
       {/* ——— MIND ——— */}

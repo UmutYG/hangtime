@@ -6,7 +6,7 @@ import { useWorkout } from '../hooks/useWorkout';
 import { theme, mono, modeIdentity, type } from '../theme';
 import { cycleMilestoneDates, fmtScheduleDate, isTrainingDay, setsRepsLabel } from '../engine/schedule';
 import { ModeMark } from '../components/ModeMark';
-import { WhyCard } from '../components/WhyCard';
+import { PreflightSheet } from '../components/PreflightSheet';
 import { WhySheet } from '../components/WhySheet';
 import { ManualLog } from '../components/ManualLog';
 import { ProgressRing } from '../components/ProgressRing';
@@ -32,6 +32,7 @@ export function TodayScreen() {
 
   const profile = store.profile!;
   const readinessInfo = useReadiness('pull');
+  const [preflight, setPreflight] = useState(false);
   // Readiness informs but never rewrites the plan: how the session actually goes
   // (reps hit, rest taken) is what the engine reads afterwards.
   const plan = useMemo(
@@ -140,7 +141,7 @@ export function TodayScreen() {
           </View>
 
           <Pressable
-            onPress={() => workout.start(plan, undefined)}
+            onPress={() => setPreflight(true)}
             style={styles.startBtn}
           >
             <Text style={styles.startBtnText}>{modeIdentity('pullups').verb}</Text>
@@ -165,7 +166,6 @@ export function TodayScreen() {
         </View>
       </View>
 
-      {!doneToday ? <WhyCard why={plan.why} /> : null}
 
       <Pressable onPress={() => setLogOpen(true)} style={styles.linkBtn}>
         <Text style={styles.linkText}>Log a session done elsewhere</Text>
@@ -187,6 +187,20 @@ export function TodayScreen() {
           setLogOpen(false);
         }}
       />
+      {preflight ? (
+        <PreflightSheet
+          plan={plan}
+          readiness={readinessInfo}
+          recent={store.sessions.filter((x) => x.dayKind !== 'custom')}
+          accent={theme.accent}
+          verb={modeIdentity('pullups').verb}
+          onCancel={() => setPreflight(false)}
+          onStart={() => {
+            setPreflight(false);
+            workout.start(plan, undefined);
+          }}
+        />
+      ) : null}
     </ScrollView>
   );
 }

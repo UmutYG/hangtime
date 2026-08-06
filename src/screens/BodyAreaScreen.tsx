@@ -111,7 +111,6 @@ export function BodyAreaScreen() {
             {LEVEL_LABEL[r.readiness.level]}
             {r.done ? ' · done today ✓' : ''} — {r.plan}
           </Text>
-          <Text style={styles.reason}>{r.readiness.reasons[0]}</Text>
         </Pressable>
       ))}
 

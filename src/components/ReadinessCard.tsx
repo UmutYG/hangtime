@@ -43,15 +43,10 @@ export function ReadinessCard({
       <View style={styles.barTrack}>
         <View style={[styles.barFill, { width: `${Math.max(4, readiness.score)}%`, backgroundColor: color }]} />
       </View>
-      {readiness.reasons.slice(0, 2).map((r, i) => (
-        <Text key={i} style={styles.reason}>
-          {r}
-        </Text>
-      ))}
-      {/* The soft verdict that used to sit here ("nothing alarming, just worth
-          knowing") said nothing the score and the reasons above don't already
-          say. The reasons stay — they justify a number that changes training.
-          The commentary on top of them doesn't. */}
+      {/* The reasons moved to the pre-flight sheet you get on starting a
+          session. They justify a number that changes training, so they are
+          kept — but they are read once, at the moment of deciding to train,
+          not stared at all day. */}
       {jointCheck ? (
         <View style={styles.jointWrap}>
           <JointCheck accent={accent} />

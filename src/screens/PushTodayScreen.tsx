@@ -10,6 +10,7 @@ import { ModeMark } from '../components/ModeMark';
 import { ProgressRing } from '../components/ProgressRing';
 import { Sheet } from '../components/Sheet';
 import { ReadinessCard } from '../components/ReadinessCard';
+import { PreflightSheet } from '../components/PreflightSheet';
 import { ResumeCard } from '../components/ResumeCard';
 import { workoutMode } from '../engine/activeWorkout';
 import { useReadiness } from '../hooks/useReadiness';
@@ -29,6 +30,7 @@ export function PushTodayScreen() {
 
   const push = store.pushState;
   const readinessInfo = useReadiness('push');
+  const [preflight, setPreflight] = useState(false);
   // Readiness informs; the engine learns from what the session actually was.
   const plan = useMemo(
     () => (push ? generatePushSession(push, undefined, todayIso()) : null),
@@ -77,7 +79,7 @@ export function PushTodayScreen() {
             <Text style={styles.startBtnText}>Start the program</Text>
           </Pressable>
         </View>
-      </ScrollView>
+    </ScrollView>
     );
   }
 
@@ -149,7 +151,7 @@ export function PushTodayScreen() {
               <Text style={styles.statCaption}>rest</Text>
             </View>
           </View>
-          <Pressable onPress={() => workout.start(plan!, undefined)} style={styles.startBtn}>
+          <Pressable onPress={() => setPreflight(true)} style={styles.startBtn}>
             <Text style={styles.startBtnText}>{modeIdentity('pushups').verb}</Text>
           </Pressable>
         </View>
@@ -183,17 +185,25 @@ export function PushTodayScreen() {
         </View>
       </View>
 
-      {!doneToday ? (
-        <View style={styles.whyCard}>
-          <Text style={styles.whyLabel}>Why this workout</Text>
-          <Text style={styles.whyText}>{plan!.why}</Text>
-        </View>
-      ) : null}
 
       <Sheet visible={whyOpen} onClose={() => setWhyOpen(false)} title="Why this workout">
         <Text style={styles.sheetLead}>{plan?.why}</Text>
         <Text style={styles.sheetBody}>{plan?.whyDetail}</Text>
       </Sheet>
+      {preflight && plan ? (
+        <PreflightSheet
+          plan={plan}
+          readiness={readinessInfo}
+          recent={store.pushSessions.filter((x) => x.dayKind !== 'pushCustom')}
+          accent={theme.push}
+          verb={modeIdentity('pushups').verb}
+          onCancel={() => setPreflight(false)}
+          onStart={() => {
+            setPreflight(false);
+            workout.start(plan, undefined);
+          }}
+        />
+      ) : null}
     </ScrollView>
   );
 }
