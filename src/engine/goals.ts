@@ -33,8 +33,11 @@ export function computeGoals(
   const goals: Goal[] = [];
   const bw = profile.bodyweightKg;
 
-  // Bodyweight reps goal
-  const currentReps = state.bwLastTestReps;
+  // Bodyweight reps goal.
+  // Measured from the best set actually performed, not the max reported at
+  // signup — a goal bar filling toward a number you've never hit is worse
+  // than no bar at all.
+  const currentReps = Math.max(state.bwBestMaxSet, 0);
   const nextRepMilestone = C.BW_REP_MILESTONES.find((m) => m > currentReps);
   if (nextRepMilestone) {
     const rate = blendedRate(tests, 'bwReps', C.RATE_BW_REPS_PER_MONTH);

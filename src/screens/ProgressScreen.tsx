@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useStore } from '../hooks/useStore';
 import { computeGoals } from '../engine/goals';
-import { e1rmSystem } from '../engine/epley';
 import { theme, mono, type } from '../theme';
 import { TrendChart, Point } from '../components/TrendChart';
 import { SettingsSheet } from '../components/SettingsSheet';
@@ -10,13 +9,11 @@ import { RoofBar } from '../components/RoofBar';
 import { MasteryPath } from '../components/MasteryPath';
 import { pullMasteryPath } from '../engine/pullVariations';
 
-type Metric = 'e1rm' | 'bwMax';
 type Range = '1m' | '3m' | 'all';
 
 export function ProgressScreen() {
   const { store } = useStore();
   const { width } = useWindowDimensions();
-  const [metric, setMetric] = useState<Metric>('e1rm');
   const [range, setRange] = useState<Range>('3m');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -29,20 +26,6 @@ export function ProgressScreen() {
     else cutoff.setFullYear(2000);
     const cut = cutoff.toISOString().slice(0, 10);
 
-    if (metric === 'e1rm') {
-      return store.sessions
-        .filter((s) => s.date >= cut)
-        .map((s) => {
-          const best = Math.max(
-            0,
-            ...s.sets
-              .filter((x) => !x.isWarmup && x.loadKg > 0 && x.actualReps > 0)
-              .map((x) => e1rmSystem(profile.bodyweightKg, x.loadKg, x.actualReps))
-          );
-          return { date: s.date, value: Math.round(best * 10) / 10 };
-        })
-        .filter((p) => p.value > 0);
-    }
     return store.sessions
       .filter((s) => s.date >= cut && ['max', 'testBw'].includes(s.dayKind))
       .map((s) => ({
@@ -50,11 +33,18 @@ export function ProgressScreen() {
         value: Math.max(0, ...s.sets.filter((x) => !x.isWarmup && x.loadKg === 0).map((x) => x.actualReps)),
       }))
       .filter((p) => p.value > 0);
-  }, [store.sessions, metric, range, profile.bodyweightKg]);
+  }, [store.sessions, range]);
 
   const goals = useMemo(
     () => computeGoals(profile, store.state, store.tests, new Date().toISOString().slice(0, 10)),
     [profile, store.state, store.tests]
+  );
+  // The weighted goal ("+37 kg × 5") is derived from an estimated 1RM built
+  // on a max he has no way to test right now, so it isn't something to chase
+  // yet. The engine keeps computing it for when a gym makes it testable.
+  const shownGoals = useMemo(
+    () => goals.filter((g) => g.quality !== 'weighted'),
+    [goals]
   );
 
   const weeksActive = useMemo(() => {
@@ -104,15 +94,7 @@ export function ProgressScreen() {
       </View>
 
       <View style={styles.card}>
-        <View style={styles.segRow}>
-          <Seg active={metric === 'e1rm'} onPress={() => setMetric('e1rm')} label="Strength (e1RM)" />
-          <Seg active={metric === 'bwMax'} onPress={() => setMetric('bwMax')} label="Max reps" />
-        </View>
-        <TrendChart
-          points={points}
-          width={chartWidth}
-          unit={metric === 'e1rm' ? 'kg system e1RM' : 'reps'}
-        />
+        <TrendChart points={points} width={chartWidth} unit="reps" />
         <View style={styles.segRow}>
           {(['1m', '3m', 'all'] as Range[]).map((r) => (
             <Seg key={r} active={range === r} onPress={() => setRange(r)} label={r} small />
@@ -122,10 +104,10 @@ export function ProgressScreen() {
 
       <View style={styles.card}>
         <Text style={type.kickerDim}>GOALS</Text>
-        {goals.length === 0 ? (
+        {shownGoals.length === 0 ? (
           <Text style={styles.dim}>Goals appear after calibration.</Text>
         ) : (
-          goals.map((g, i) => {
+          shownGoals.map((g, i) => {
             const pct = Math.min(
               100,
               Math.max(
@@ -163,15 +145,16 @@ export function ProgressScreen() {
           <Text style={styles.dim}>PRs land here — first ones usually within 2 weeks.</Text>
         ) : (
           [...store.prs]
+            // Estimated-1RM PRs are hidden: the estimate rests on a max he
+            // has no way to test right now, so it isn't a thing to chase.
+            .filter((pr) => pr.kind === 'bwReps')
             .reverse()
             .slice(0, 8)
             .map((pr, i) => (
               <View key={i} style={styles.prRow}>
-                <Text style={styles.prText}>
-                  {pr.kind === 'bwReps' ? 'Bodyweight max' : 'Estimated 1RM'}
-                </Text>
+                <Text style={styles.prText}>Bodyweight max</Text>
                 <Text style={[styles.prValue, mono]}>
-                  {pr.kind === 'bwReps' ? `${pr.value} reps` : `${pr.value} kg`} · {pr.date.slice(5)}
+                  {pr.value} reps · {pr.date.slice(5)}
                 </Text>
               </View>
             ))

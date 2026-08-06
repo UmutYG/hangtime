@@ -161,7 +161,7 @@ export function TodayScreen() {
               ? `Deload ${fmtScheduleDate(milestones.deload, todayIso())}`
               : 'Deload week — retest coming up'}
             {'  ·  '}
-            <Text style={mono}>{store.state.bwLastTestReps}</Text> rep max
+            <Text style={mono}>{store.state.bwBestMaxSet}</Text> best set
           </Text>
         </View>
       </View>
