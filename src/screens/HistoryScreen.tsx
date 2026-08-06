@@ -7,6 +7,7 @@ import { theme, mono, type } from '../theme';
 import { ManualLog } from '../components/ManualLog';
 import { RunLog } from '../components/RunLog';
 import { RoofBar } from '../components/RoofBar';
+import { TrainingCalendar } from '../components/TrainingCalendar';
 import { SessionDetail } from '../components/SessionDetail';
 import { DAY_LABEL, DAY_TITLE } from '../lib/dayLabels';
 
@@ -64,6 +65,7 @@ export function HistoryScreen() {
   const [logOpen, setLogOpen] = useState(false);
   const [runLogOpen, setRunLogOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const profile = store.profile!;
   const mode = store.appMode;
@@ -90,6 +92,14 @@ export function HistoryScreen() {
       <RoofBar />
       <View style={styles.headerRow}>
         <Text style={type.hero}>History</Text>
+        <Pressable
+          onPress={() => setCalendarOpen(true)}
+          style={styles.calBtn}
+          hitSlop={8}
+          accessibilityLabel="Training calendar"
+        >
+          <Text style={styles.calIcon}>▦</Text>
+        </Pressable>
         <Pressable
           onPress={() => (mode === 'running' ? setRunLogOpen(true) : setLogOpen(true))}
           style={styles.addBtn}
@@ -273,6 +283,7 @@ export function HistoryScreen() {
           setEditingRun(null);
         }}
       />
+      {calendarOpen ? <TrainingCalendar onClose={() => setCalendarOpen(false)} /> : null}
     </ScrollView>
   );
 }
@@ -280,6 +291,8 @@ export function HistoryScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: theme.pad, gap: 12, paddingBottom: 120 },
+  calBtn: { marginLeft: 'auto', marginRight: 10, paddingHorizontal: 4, paddingVertical: 2 },
+  calIcon: { fontSize: 19, color: theme.textDim },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   addBtn: {
     backgroundColor: theme.card,
