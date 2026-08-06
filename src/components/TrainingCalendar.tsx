@@ -9,12 +9,15 @@ import {
 } from '../engine/calendar';
 import type { ISODate } from '../engine/types';
 import { useStore } from '../hooks/useStore';
-import { mono, theme } from '../theme';
+import { AppMode, mono, theme } from '../theme';
+import { ModeMark } from './ModeMark';
 
-const SPACES = [
-  { key: 'pull' as const, color: theme.accent },
-  { key: 'push' as const, color: theme.push },
-  { key: 'run' as const, color: theme.run },
+// The same marks the spaces use elsewhere — a day reads as "pull-ups and
+// push-ups" rather than "orange and purple", with nothing to decode.
+const SPACES: { key: string; mode: AppMode; label: string; color: string }[] = [
+  { key: 'pull', mode: 'pullups', label: 'Pull', color: theme.accent },
+  { key: 'push', mode: 'pushups', label: 'Push', color: theme.push },
+  { key: 'run', mode: 'running', label: 'Run', color: theme.run },
 ];
 
 function todayIso(): ISODate {
@@ -106,12 +109,9 @@ export function TrainingCalendar({ onClose }: { onClose: () => void }) {
                         >
                           {Number(date.slice(8))}
                         </Text>
-                        <View style={styles.dots}>
+                        <View style={styles.marks}>
                           {SPACES.filter((s) => trained?.has(s.key)).map((s) => (
-                            <View
-                              key={s.key}
-                              style={[styles.dot, { backgroundColor: s.color }]}
-                            />
+                            <ModeMark key={s.key} mode={s.mode} size={13} color={s.color} />
                           ))}
                         </View>
                       </View>
@@ -144,10 +144,8 @@ export function TrainingCalendar({ onClose }: { onClose: () => void }) {
             <View style={styles.legend}>
               {SPACES.map((s) => (
                 <View key={s.key} style={styles.legendItem}>
-                  <View style={[styles.dot, { backgroundColor: s.color }]} />
-                  <Text style={styles.legendText}>
-                    {s.key === 'pull' ? 'Pull' : s.key === 'push' ? 'Push' : 'Run'}
-                  </Text>
+                  <ModeMark mode={s.mode} size={13} color={s.color} />
+                  <Text style={styles.legendText}>{s.label}</Text>
                 </View>
               ))}
               <Text style={[styles.legendCount, mono]}>{monthDates.length} days</Text>
@@ -193,8 +191,8 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   dayBox: {
-    width: 40,
-    height: 42,
+    width: 46,
+    height: 46,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -205,8 +203,7 @@ const styles = StyleSheet.create({
   dayNum: { fontSize: 12.5, color: theme.textFaint },
   dayNumOn: { color: theme.text, fontWeight: '700' },
   dayNumToday: { color: theme.text },
-  dots: { flexDirection: 'row', gap: 3, height: 6, alignItems: 'center' },
-  dot: { width: 5.5, height: 5.5, borderRadius: 3 },
+  marks: { flexDirection: 'row', gap: 2, height: 14, alignItems: 'center' },
   tallyRow: {
     marginTop: 12,
     paddingTop: 10,
