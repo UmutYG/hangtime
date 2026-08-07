@@ -5,7 +5,6 @@ import { supDayFor } from '../engine/supplements';
 import { todayLine } from '../engine/absorption';
 import { workoutMode } from '../engine/activeWorkout';
 import { getEvents } from '../mind/lib/events';
-import { loadSettings as loadMindSettings } from '../mind/lib/settings';
 import { useStore } from '../hooks/useStore';
 import { useWorkout } from '../hooks/useWorkout';
 import { useJointFeel, useLoadEntries } from '../hooks/useReadiness';
@@ -58,18 +57,13 @@ export function RoofHomeScreen() {
     (store.runs.some((r) => r.date === today) ? 1 : 0);
   const hasPending = workout.pending ? workoutMode(workout.pending) : null;
 
-  // ——— Mind: today's noticed signs + the vision wall, read from the module ———
-  // Re-read when the settings sheet closes: a restore writes the mind's keys
-  // underneath us, and the card would otherwise still show the old count.
-  const [mindLine, setMindLine] = useState<{ signsToday: number; visions: number } | null>(null);
+  // ——— Mind: how many good things you noticed today ———
+  const [mindLine, setMindLine] = useState<{ signsToday: number } | null>(null);
   useEffect(() => {
     let alive = true;
-    Promise.all([getEvents(), loadMindSettings()]).then(([events, ms]) => {
+    getEvents().then((events) => {
       if (!alive) return;
-      setMindLine({
-        signsToday: events.filter((e) => e.date === today).length,
-        visions: ms.visionCards.length,
-      });
+      setMindLine({ signsToday: events.filter((e) => e.date === today).length });
     });
     return () => {
       alive = false;

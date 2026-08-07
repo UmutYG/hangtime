@@ -38,7 +38,6 @@ export function LogEventSheet({
   visible: boolean;
   onClose: () => void;
 }) {
-  const { t } = useSettings();
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
 
@@ -105,12 +104,12 @@ export function LogEventSheet({
       >
         <Pressable style={styles.backdrop} onPress={close}>
           <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text style={styles.title}>{t("event.title")}</Text>
+            <Text style={styles.title}>{"Positive sign"}</Text>
             <Field
               value={text}
               onChangeText={setText}
               multiline
-              placeholder={listening ? t("event.listening") : t("event.placeholder")}
+              placeholder={listening ? "Listening…" : "What did you notice today? A small synchronicity, good news, a step forward…"}
               autoFocus
             />
             <View style={{ height: spacing.md }} />
@@ -119,12 +118,12 @@ export function LogEventSheet({
                 onPress={toggleMic}
                 style={[styles.mic, listening && styles.micOn]}
                 accessibilityRole="button"
-                accessibilityLabel={t("event.speak")}
+                accessibilityLabel={"Say it instead"}
               >
                 <Text style={[styles.micGlyph, listening && styles.micGlyphOn]}>●</Text>
               </Pressable>
               <View style={{ flex: 1 }}>
-                <PrimaryButton title={t("event.save")} onPress={submit} />
+                <PrimaryButton title={"Add"} onPress={submit} />
               </View>
             </View>
           </Pressable>

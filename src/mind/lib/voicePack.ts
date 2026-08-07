@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Lang } from "./i18n";
 import { generateVoicePack, VoicePack } from "./claude";
 import { normalizeLines } from "./text";
 
@@ -54,12 +53,12 @@ export function fillMoment(line: string, moment: string): string {
 // it just speaks in its original voice.
 let inFlight: Promise<VoicePack> | null = null;
 
-export async function getVoicePack(lang: Lang, apiKey: string): Promise<VoicePack> {
+export async function getVoicePack(apiKey: string): Promise<VoicePack> {
   try {
     const raw = await AsyncStorage.getItem(CACHE_KEY);
     if (raw) {
       const c = JSON.parse(raw);
-      if (c.lang === lang && Date.now() - c.createdAt < TTL && c.pack) {
+      if (Date.now() - c.createdAt < TTL && c.pack) {
         return validate(c.pack);
       }
     }
@@ -77,7 +76,7 @@ export async function getVoicePack(lang: Lang, apiKey: string): Promise<VoicePac
         const pack = validate(gen);
         await AsyncStorage.setItem(
           CACHE_KEY,
-          JSON.stringify({ lang, pack, createdAt: Date.now() })
+          JSON.stringify({ pack, createdAt: Date.now() })
         ).catch(() => {});
         return pack;
       } catch {

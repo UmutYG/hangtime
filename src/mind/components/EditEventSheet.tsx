@@ -12,7 +12,6 @@ import {
 import { colors, font, radius, spacing } from "../lib/theme";
 import { useSettings } from "../lib/SettingsContext";
 import { PositiveEvent, updateEvent, deleteEvent } from "../lib/events";
-import { DEFAULT_VISION_ID, defaultVisionCard } from "../lib/defaultVision";
 import { Field, PrimaryButton } from "./ui";
 
 // Tap a logged sign to fix a typo, re-match it to a vision card, or delete it.
@@ -23,18 +22,11 @@ export function EditEventSheet({
   event: PositiveEvent | null;
   onClose: () => void;
 }) {
-  const { t, lang, settings } = useSettings();
-  const [text, setText] = useState("");
+    const [text, setText] = useState("");
 
   useEffect(() => {
     setText(event?.text ?? "");
   }, [event]);
-
-  const matchedCard = event
-    ? event.matchedCardId === DEFAULT_VISION_ID
-      ? defaultVisionCard(lang, t)
-      : settings.visionCards.find((c) => c.id === event.matchedCardId)
-    : undefined;
 
   async function save() {
     const value = text.trim();
@@ -62,22 +54,17 @@ export function EditEventSheet({
       >
         <Pressable style={styles.backdrop} onPress={onClose}>
           <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text style={styles.title}>{t("edit.title")}</Text>
+            <Text style={styles.title}>{"Edit sign"}</Text>
             <Field value={text} onChangeText={setText} multiline autoFocus />
 
-            {matchedCard && (
-              <Text style={styles.matched}>
-                {t("flow.matched")} {matchedCard.text}
-              </Text>
-            )}
 
             <View style={{ height: spacing.md }} />
-            <PrimaryButton title={t("edit.save")} onPress={save} />
+            <PrimaryButton title={"Save"} onPress={save} />
 
             <View style={styles.actions}>
               <View style={{ flex: 1 }} />
               <Pressable onPress={remove} hitSlop={8}>
-                <Text style={styles.delete}>{t("edit.delete")}</Text>
+                <Text style={styles.delete}>{"Delete"}</Text>
               </Pressable>
             </View>
           </Pressable>

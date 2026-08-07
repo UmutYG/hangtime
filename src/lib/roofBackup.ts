@@ -12,23 +12,20 @@ import { migrate } from './storage';
 // nothing else needs its own cloud path.
 
 /** every AsyncStorage key the mind module owns (mirrors the standalone Slide app) */
+// Every key the Mind room still writes. The vision board, strengths list,
+// reframes, mirror feed and why-questions were removed 2026-08-07, so their
+// keys are gone from here too — a backup should carry what the app has, not
+// a museum of what it used to. `settings:v2` stays only so a restore from an
+// older snapshot can still hand its API key to the v3 migration.
 export const MIND_KEYS = [
+  'settings:v3',
   'settings:v2',
-  'settings:v1',
   'events:v1',
-  'strengths:v1',
-  'reframes:v1',
-  'visionReflections:v1',
-  'visionWhyLastAsked',
   'dailyRecap:v2',
   'weeklyRecap:v1',
   'recapDoneV2',
-  'mirrorFeed:v1',
-  'mirrorThanks:v1',
+  'heartfeltReminders:v3',
   'voicePack:v4',
-  'whyQuestions:v1',
-  'dissolveRatings:v1',
-  'dissolveAskedWeek',
 ] as const;
 
 const MIND_KEY_SET = new Set<string>(MIND_KEYS);

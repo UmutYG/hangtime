@@ -2,7 +2,6 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Lang } from "./i18n";
 import { dateKey, dateIndex, addDays } from "./dates";
 import { addEvent, getEvents, PositiveEvent } from "./events";
 import { generateHeartfeltReminders } from "./claude";
@@ -37,31 +36,7 @@ const LOG_ACTION = "INPUT";
 // full rewrite 2026-07-16 after an AI-generated line came out stiff and
 // half-translated ("İyi olan şeyi biraz abartmak özür dile...") — see the
 // calibration lines baked into generateHeartfeltReminders's prompt too.
-const FALLBACK: Record<Lang, string[]> = {
-  tr: [
-    "Bugün güzel bir şey oldu, hemen unuttun değil mi? Unutmayadabilirdin. Kim tutuyor seni?",
-    "3 saniye de olsa, bugünkü güzel hissi bir daha yaşasan ne olur?",
-    "İyi bir şeyin tadını çıkarmak için kimseden izin almana gerek yok. Şu an dahil.",
-    "Bugün olan güzel bir şeyi abartsan kime ne zararı olur? Abart gitsin.",
-    "Dur bi' — şu an bir şey yolunda gidiyor ve sen fark etmiyorsun. Bul onu.",
-    "Dünya bugün sana küçük bir jest yaptı. Görmediysen tekrar bak.",
-    "'Fena değildi' dediğin o an aslında harikaydı. Küçültme.",
-    "Rahat bir nefes aldığın o an vardı ya — önemliydi. Unutma.",
-    "Dikkatin senin, istediğin yere çevirebilirsin. Kimse karışamaz.",
-    "İyi bir anı bir kez daha hissetmek bedava. Üstelik süresi de dolmuyor.",
-    "Kaybedecek bir şeyin yok, bugünü bi' oyun gibi oyna.",
-    "Bir nefes al. Kafanda büyüttüğün kadar büyük değil aslında.",
-    "Zorladıkça kaçıyor, bıraktıkça geliyor — bugün bir şeyi bırakmayı dene.",
-    "Sakin kalana hiçbir şey tutunamaz. Bugün telaşa katılma.",
-    "Önemi düşür, ağırlık kendiliğinden hafifler.",
-    "Şu anki nefesin dışında hiçbir şey gerçek değil şu an. Onda kal biraz.",
-    "Kafanı kurcalayan şey, sandığın kadar ağır değil aslında.",
-    "Hiçbir şey seni burada tutmuyor. İstersen başka bir şeye bak şimdi.",
-    "Güzel bir şey düşünmek için özel bir an gerekmiyor. Bu an da olur.",
-    "Ters giden bir şey bile yolun parçası olabilir. Öyle say, düzelsin.",
-    "Bugünkü aksilik belki de doğru yolun bir parçası. Karar senin.",
-  ],
-  en: [
+const FALLBACK: string[] = [
     "Something good happened today and you probably forgot it already. Didn't have to. Who's stopping you?",
     "Even three seconds — relive that good feeling from today, why not?",
     "You don't need anyone's permission to enjoy something good. Right now included.",
@@ -83,33 +58,23 @@ const FALLBACK: Record<Lang, string[]> = {
     "You don't need a special moment to think of something good. This one works fine.",
     "Even the thing going wrong might be exactly on track. Call it that and watch it straighten out.",
     "Today's hiccup might just be part of the right path. Your call.",
-  ],
-};
+];
 
 // Morning echo of YESTERDAY's last noticed moment — the mirror remembering,
 // not the app counting. This replaced the streak/count fragments ("day 3 in
 // a row"): scorekeeping inflates importance and reads as a chore app, while
 // echoing the person's own words back reads as being seen.
-const ECHO_LINES: Record<Lang, ((short: string) => string)[]> = {
-  tr: [
-    (s) => `Dün “${s}” demiştin, bugün unutmuş bile olabilirsin. Unutmayadabilirdin — geri dön, kim tutuyor seni?`,
-    (s) => `“${s}” — dünkü o ışık hâlâ senin. 3 saniye de olsa bir daha hisset.`,
-    (s) => `Dün “${s}” fark ettin. Bugüne de aynı gözle bak, bakalım ne çıkacak.`,
-    (s) => `“${s}” — dün buydu senin. Bugünkü daha isimsiz, ilk sen gör.`,
-    (s) => `Dün “${s}” demiştin ya — unuttun mu şimdiden? Unutmayadabilirdin.`,
-  ],
-  en: [
+const ECHO_LINES: ((short: string) => string)[] = [
     (s) => `You said “${s}” yesterday, you've probably already forgotten it. Didn't have to — who's stopping you from going back?`,
     (s) => `“${s}” — that glow from yesterday is still yours. Even three seconds, feel it again.`,
     (s) => `You noticed “${s}” yesterday. Look at today with the same eyes, see what shows up.`,
     (s) => `“${s}” — that was yesterday. Today's is still unnamed, be the first to catch it.`,
     (s) => `You said “${s}” yesterday — forgot it already, huh? Didn't have to.`,
-  ],
-};
+];
 
-function echoLine(lang: Lang, sample: string, dateStr: string): string {
+function echoLine(sample: string, dateStr: string): string {
   const short = sample.length > 80 ? sample.slice(0, 78) + "…" : sample;
-  const pool = ECHO_LINES[lang];
+  const pool = ECHO_LINES;
   return pool[dateIndex(dateStr, pool.length, "echo")](short);
 }
 
@@ -122,8 +87,7 @@ function shorten(sample: string): string {
 
 function momentLine(
   packLines: string[],
-  staticLine: (lang: Lang, sample: string, dateStr: string) => string,
-  lang: Lang,
+  staticLine: (sample: string, dateStr: string) => string,
   sample: string,
   dateStr: string,
   salt: string
@@ -131,7 +95,7 @@ function momentLine(
   if (packLines.length) {
     return fillMoment(packLines[dateIndex(dateStr, packLines.length, salt)], shorten(sample));
   }
-  return staticLine(lang, sample, dateStr);
+  return staticLine(sample, dateStr);
 }
 
 // v3: the voice went casual/spoken instead of translated-English-idiom
@@ -147,37 +111,16 @@ const LOG_HOUR = 20; // an evening invite to notice something good
 
 // Several evening invites instead of one fixed line, picked per date the
 // same deterministic way — the reflex-breaking voice, not a repeating chore.
-const LOG_INVITES: Record<Lang, string[]> = {
-  tr: [
-    "Bugün bir şey iyi gitti, biliyorum. Ufacık da olsa buraya bırak.",
-    "Günün güzel bir anını bir daha düşünsen kim karışır? Hangisiydi?",
-    "Günün bir yerinde rahat bir nefes aldın. Neydi o?",
-    "Bugünü bir sallasan, gözden kaçırdığın bir güzellik düşerdi. Bul onu.",
-    "Bir dakikan var mı? Bugünden bir tane, ufacık da olsa.",
-    "Gün bitiyor, sen hâlâ yazmadın. Otuz saniyeni al, kim tutuyor seni?",
-  ],
-  en: [
+const LOG_INVITES: string[] = [
     "Something went right today, I know it. However small, leave it here.",
     "Who's stopping you from thinking about today's good moment one more time? Which one was it?",
     "Somewhere today you breathed easy for a second. What was it?",
     "Shake today out and something good you missed would fall out. Find it.",
     "Got a minute? One thing from today, however tiny.",
     "Day's almost over, still haven't written it down. Thirty seconds — who's stopping you?",
-  ],
-};
+];
 
-const TEXT: Record<Lang, { logButton: string; logPlaceholder: string; logSubmit: string }> = {
-  tr: {
-    logButton: "Yaz",
-    logPlaceholder: "Küçük bir olumlu işaret…",
-    logSubmit: "Ekle",
-  },
-  en: {
-    logButton: "Write",
-    logPlaceholder: "A small positive sign…",
-    logSubmit: "Add",
-  },
-};
+const TEXT = { logButton: "Write", logPlaceholder: "A small positive sign…", logSubmit: "Add" };
 
 export async function requestPermissions(): Promise<boolean> {
   if (!Device.isDevice) return false;
@@ -196,8 +139,8 @@ export async function requestPermissions(): Promise<boolean> {
   return status === "granted";
 }
 
-async function setupCategory(lang: Lang): Promise<void> {
-  const text = TEXT[lang];
+async function setupCategory(): Promise<void> {
+  const text = TEXT;
   await Notifications.setNotificationCategoryAsync(LOG_CATEGORY, [
     {
       identifier: LOG_ACTION,
@@ -210,18 +153,18 @@ async function setupCategory(lang: Lang): Promise<void> {
 
 // Get the pool of heartfelt lines: cached weekly, AI-generated when a key is
 // present, otherwise the curated fallback.
-async function getHeartfeltLines(lang: Lang, apiKey: string): Promise<string[]> {
+async function getHeartfeltLines(apiKey: string): Promise<string[]> {
   try {
     const raw = await AsyncStorage.getItem(REMINDER_CACHE);
     if (raw) {
       const c = JSON.parse(raw);
-      if (c.lang === lang && Date.now() - c.createdAt < REMINDER_TTL && c.lines?.length >= DAYS_AHEAD) {
+      if (Date.now() - c.createdAt < REMINDER_TTL && c.lines?.length >= DAYS_AHEAD) {
         return c.lines;
       }
     }
   } catch {}
 
-  let lines = FALLBACK[lang];
+  let lines = FALLBACK;
   if (apiKey) {
     try {
       const gen = await generateHeartfeltReminders(apiKey, 14);
@@ -232,7 +175,7 @@ async function getHeartfeltLines(lang: Lang, apiKey: string): Promise<string[]> 
   }
   AsyncStorage.setItem(
     REMINDER_CACHE,
-    JSON.stringify({ lang, lines, createdAt: Date.now() })
+    JSON.stringify({ lines, createdAt: Date.now() })
   ).catch(() => {});
   return lines;
 }
@@ -261,9 +204,9 @@ async function getHeartfeltLines(lang: Lang, apiKey: string): Promise<string[]> 
 // duplicates. `inFlight` collapses overlapping calls into the one already
 // running instead of racing a second cancel+reschedule cycle against it.
 let inFlight: Promise<void> | null = null;
-export function scheduleDailyReminders(lang: Lang, apiKey: string): Promise<void> {
+export function scheduleDailyReminders(apiKey: string): Promise<void> {
   if (inFlight) return inFlight;
-  inFlight = scheduleDailyRemindersNow(lang, apiKey).finally(() => {
+  inFlight = scheduleDailyRemindersNow(apiKey).finally(() => {
     inFlight = null;
   });
   return inFlight;
@@ -278,7 +221,7 @@ export function scheduleDailyReminders(lang: Lang, apiKey: string): Promise<void
 // persisted): a fresh process reschedules once, which is exactly right.
 let lastScheduleKey: string | null = null;
 
-async function scheduleDailyRemindersNow(lang: Lang, apiKey: string): Promise<void> {
+async function scheduleDailyRemindersNow(apiKey: string): Promise<void> {
   const now = new Date();
 
   let yesterdaysSample: string | null = null;
@@ -289,7 +232,7 @@ async function scheduleDailyRemindersNow(lang: Lang, apiKey: string): Promise<vo
     if (yest.length > 0) yesterdaysSample = yest[0].text; // last noticed yesterday
   } catch {}
 
-  const scheduleKey = [dateKey(), lang, yesterdaysSample ?? ""].join(" ");
+  const scheduleKey = [dateKey(), yesterdaysSample ?? ""].join(" ");
   if (scheduleKey === lastScheduleKey) return;
 
   // Cancel the whole mind window and rebuild it. This must leave OTHER rooms
@@ -307,9 +250,9 @@ async function scheduleDailyRemindersNow(lang: Lang, apiKey: string): Promise<vo
       })
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier))
   );
-  const lines = await getHeartfeltLines(lang, apiKey);
-  const pack = await getVoicePack(lang, apiKey);
-  const invites = pack.invites.length ? pack.invites : LOG_INVITES[lang];
+  const lines = await getHeartfeltLines(apiKey);
+  const pack = await getVoicePack(apiKey);
+  const invites = pack.invites.length ? pack.invites : LOG_INVITES;
 
   for (let d = 0; d < DAYS_AHEAD; d++) {
     const morning = new Date(now);
@@ -321,7 +264,7 @@ async function scheduleDailyRemindersNow(lang: Lang, apiKey: string): Promise<vo
       // echoing the wrong "yesterday", so those stay on the general pool.
       const body =
         d === 0 && yesterdaysSample
-          ? momentLine(pack.echo, echoLine, lang, yesterdaysSample, key, "echo")
+          ? momentLine(pack.echo, echoLine, yesterdaysSample, key, "echo")
           : lines[dateIndex(key, lines.length, "am")];
       await Notifications.scheduleNotificationAsync({
         content: { title: APP_TITLE, body, data: { room: "mind" } },
@@ -367,11 +310,11 @@ async function scheduleDailyRemindersNow(lang: Lang, apiKey: string): Promise<vo
   lastScheduleKey = scheduleKey;
 }
 
-export async function ensureNotifications(lang: Lang, apiKey: string): Promise<boolean> {
+export async function ensureNotifications(apiKey: string): Promise<boolean> {
   const granted = await requestPermissions();
   if (granted) {
-    await setupCategory(lang);
-    await scheduleDailyReminders(lang, apiKey);
+    await setupCategory();
+    await scheduleDailyReminders(apiKey);
   }
   return granted;
 }

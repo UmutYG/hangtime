@@ -31,7 +31,7 @@ export function DailyRecap({
   events: PositiveEvent[];
   onClose: () => void;
 }) {
-  const { t, lang, settings } = useSettings();
+  const { settings } = useSettings();
   const dates = useMemo(
     () => Array.from(new Set(events.map((e) => e.date))).sort(),
     [events]
@@ -84,7 +84,7 @@ export function DailyRecap({
     if (!settings.apiKey) {
       setData({
         sections: [
-          { visionId: null, title: t("recap.general"), narrative: "", points: dayEvents.map((e) => e.text) },
+          { visionId: null, title: "General awareness", narrative: "", points: dayEvents.map((e) => e.text) },
         ],
         closing: "",
       });
@@ -127,8 +127,8 @@ export function DailyRecap({
 
   const dayEventCount = selectedDate ? events.filter((e) => e.date === selectedDate).length : 0;
   const today = dateKey();
-  const locale = lang === "tr" ? "tr-TR" : "en-US";
-  const dayLabel = (d: string) => (d === today ? t("dailyRecap.today") : shortWeekday(d, locale));
+  const locale = "en-US";
+  const dayLabel = (d: string) => (d === today ? "Today" : shortWeekday(d, locale));
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -144,26 +144,24 @@ export function DailyRecap({
         />
       ) : phase === "loading" ? (
         <RecapLoading
-          visions={settings.visionCards.map((c) => c.text)}
           onClose={onClose}
           onCancel={cancelGeneration}
-          label={t("dailyRecap.building")}
+          label={"Building the day's recap…"}
         />
       ) : phase === "error" ? (
         <View style={styles.errWrap}>
           <Pressable style={styles.close} hitSlop={12} onPress={onClose}>
             <Text style={styles.closeTxt}>✕</Text>
           </Pressable>
-          <Text style={styles.errTxt}>{t("reflect.error")}</Text>
+          <Text style={styles.errTxt}>{"Couldn't generate just now. Try again shortly."}</Text>
           {!!errMsg && <Text style={styles.errDetail}>[{errMsg}]</Text>}
           <Pressable style={styles.keepBtn} onPress={onClose}>
-            <Text style={styles.keepTxt}>{t("common.close")}</Text>
+            <Text style={styles.keepTxt}>{"Close"}</Text>
           </Pressable>
         </View>
       ) : data ? (
         <DailyStories
           data={data}
-          visionCards={settings.visionCards}
           momentCount={dayEventCount}
           dates={dates}
           selectedDate={selectedDate}
@@ -197,7 +195,6 @@ function ConfirmScreen({
   onClose: () => void;
   onGenerate: () => void;
 }) {
-  const { t } = useSettings();
   return (
     <View style={styles.confirmWrap}>
       <Pressable style={styles.close} hitSlop={12} onPress={onClose}>
@@ -223,15 +220,15 @@ function ConfirmScreen({
 
       <View style={styles.confirmBody}>
         <Text style={styles.kicker}>{dayLabel(selectedDate)}</Text>
-        <Text style={styles.confirmTitle}>{t("dailyRecap.confirmTitle")}</Text>
+        <Text style={styles.confirmTitle}>{"Write this day's recap?"}</Text>
         <Text style={styles.confirmSub}>
-          {momentCount} {t("dailyRecap.momentsShort")} · {t("dailyRecap.confirmSub")}
+          {momentCount} {"moments"} · {"Not made yet — happy to write it now if you'd like."}
         </Text>
         <Pressable style={styles.doneBtn} onPress={onGenerate}>
-          <Text style={styles.doneTxt}>{t("dailyRecap.confirmBtn")}</Text>
+          <Text style={styles.doneTxt}>{"Create"}</Text>
         </Pressable>
         <Pressable style={styles.keepBtn} onPress={onClose}>
-          <Text style={styles.keepTxt}>{t("common.close")}</Text>
+          <Text style={styles.keepTxt}>{"Close"}</Text>
         </Pressable>
       </View>
     </View>
@@ -242,20 +239,17 @@ function ConfirmScreen({
 // A cancel link stays available the whole time — writing this is never a
 // trap you have to sit through.
 function RecapLoading({
-  visions,
   label,
   onClose,
   onCancel,
 }: {
-  visions: string[];
   label: string;
   onClose: () => void;
   onCancel: () => void;
 }) {
-  const { t } = useSettings();
   const [i, setI] = useState(0);
   const fade = useRef(new Animated.Value(0)).current;
-  const pool = visions.length ? visions : [label];
+  const pool = [label];
 
   useEffect(() => {
     let idx = 0;
@@ -284,7 +278,7 @@ function RecapLoading({
       <Text style={styles.loadLabel}>{label}</Text>
       <Animated.Text style={[styles.loadVision, { opacity: fade }]}>{pool[i]}</Animated.Text>
       <Pressable style={styles.cancelLink} onPress={onCancel} hitSlop={8}>
-        <Text style={styles.cancelTxt}>{t("common.cancel")}</Text>
+        <Text style={styles.cancelTxt}>{"Cancel"}</Text>
       </Pressable>
     </View>
   );
@@ -296,7 +290,6 @@ function RecapLoading({
 // current week you're looking at without leaving the sheet.
 function DailyStories({
   data,
-  visionCards,
   momentCount,
   dates,
   selectedDate,
@@ -306,7 +299,6 @@ function DailyStories({
   onRegenerate,
 }: {
   data: RecapData;
-  visionCards: { id: string; tint: number }[];
   momentCount: number;
   dates: string[];
   selectedDate: string;
@@ -315,7 +307,6 @@ function DailyStories({
   onClose: () => void;
   onRegenerate: () => void;
 }) {
-  const { t } = useSettings();
   const scenes = useMemo<Scene[]>(() => {
     const ordered = [...data.sections].sort((a, b) => {
       const av = a.visionId ? 0 : 1;
@@ -337,8 +328,7 @@ function DailyStories({
 
   function tintFor(visionId: string | null) {
     if (!visionId) return cardTints[2];
-    const card = visionCards.find((c) => c.id === visionId);
-    return cardTints[(card?.tint ?? 0) % cardTints.length];
+    return cardTints[2];
   }
 
   useEffect(() => {
@@ -407,10 +397,10 @@ function DailyStories({
         <Animated.View style={[styles.scene, { opacity: fade, transform: [{ translateY: slideY }] }]}>
           {scene.kind === "intro" && (
             <>
-              <Text style={styles.kicker}>{t("dailyRecap.kicker")}</Text>
-              <Text style={styles.introTitle}>{t("dailyRecap.cardTitle")}</Text>
+              <Text style={styles.kicker}>{"Day"}</Text>
+              <Text style={styles.introTitle}>{"Day's Recap"}</Text>
               <Text style={styles.introSub}>
-                {momentCount} {t("dailyRecap.cardSub")}
+                {momentCount} {"review the moments"}
               </Text>
             </>
           )}
@@ -431,12 +421,12 @@ function DailyStories({
           {isClosing && (
             <>
               {!!data.closing && <Text style={styles.closing}>{data.closing}</Text>}
-              <Text style={styles.reassure}>{t("dailyRecap.note")}</Text>
+              <Text style={styles.reassure}>{"This stays here, nothing gets deleted. Add something new during the day and you can regenerate it."}</Text>
               <Pressable style={styles.doneBtn} onPress={onClose}>
-                <Text style={styles.doneTxt}>{t("common.close")}</Text>
+                <Text style={styles.doneTxt}>{"Close"}</Text>
               </Pressable>
               <Pressable style={styles.keepBtn} onPress={onRegenerate}>
-                <Text style={styles.keepTxt}>{t("dailyRecap.regenerate")}</Text>
+                <Text style={styles.keepTxt}>{"↻ Regenerate"}</Text>
               </Pressable>
             </>
           )}
@@ -450,10 +440,10 @@ function DailyStories({
             onPress={goPrev}
             disabled={isFirst}
           >
-            <Text style={styles.navTxt}>‹ {t("recap.back")}</Text>
+            <Text style={styles.navTxt}>‹ {"Back"}</Text>
           </Pressable>
           <Pressable style={[styles.navBtn, styles.navBtnPrimary]} onPress={goNext}>
-            <Text style={[styles.navTxt, styles.navTxtPrimary]}>{t("recap.next")} ›</Text>
+            <Text style={[styles.navTxt, styles.navTxtPrimary]}>{"Next"} ›</Text>
           </Pressable>
         </View>
       )}

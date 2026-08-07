@@ -22,7 +22,7 @@ import { theme } from "../theme";
 type Tab = "practice" | "flow";
 
 function Shell() {
-  const { ready, settings, t, reload } = useSettings();
+  const { ready, settings, reload } = useSettings();
   const [tab, setTab] = useState<Tab>("practice");
   const insets = useSafeAreaInsets();
 
@@ -38,8 +38,8 @@ function Shell() {
 
   useEffect(() => {
     if (!ready) return;
-    ensureNotifications(settings.language, settings.apiKey);
-  }, [ready, settings.language, settings.apiKey]);
+    ensureNotifications(settings.apiKey);
+  }, [ready, settings.apiKey]);
 
   // Once per cold start: drop events older than a year (safety valve that
   // keeps the hot-path JSON parse bounded).
@@ -52,10 +52,10 @@ function Shell() {
   useEffect(() => {
     if (!ready) return;
     const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") ensureNotifications(settings.language, settings.apiKey);
+      if (state === "active") ensureNotifications(settings.apiKey);
     });
     return () => sub.remove();
-  }, [ready, settings.language, settings.apiKey]);
+  }, [ready, settings.apiKey]);
 
   // Handle replies to "jot a positive sign" notifications (even from the lock
   // screen, without opening the app), and route reflection nudges to Flow.

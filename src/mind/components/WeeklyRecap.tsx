@@ -16,7 +16,7 @@ type Scene =
 
 // A Spotify-Wrapped-style review of the week: tap through one story per vision,
 // each reflecting back who you're becoming. While it's being written, a calm
-// screen cycles your visions so the wait feels alive. At the end you can let the
+// screen holds one calm line so the wait feels alive. At the end you can let the
 // week go and start clean.
 export function WeeklyRecap({
   visible,
@@ -29,7 +29,7 @@ export function WeeklyRecap({
   onClose: () => void;
   onCleared: () => void;
 }) {
-  const { t, lang, settings } = useSettings();
+  const { settings } = useSettings();
   const [phase, setPhase] = useState<"confirm" | "loading" | "ready" | "error">("confirm");
   const [data, setData] = useState<RecapData | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
@@ -66,7 +66,7 @@ export function WeeklyRecap({
         if (alive) {
           setData({
             sections: [
-              { visionId: null, title: t("recap.general"), narrative: "", points: events.map((e) => e.text) },
+              { visionId: null, title: "General awareness", narrative: "", points: events.map((e) => e.text) },
             ],
             closing: "",
           });
@@ -130,41 +130,39 @@ export function WeeklyRecap({
           <Pressable style={styles.close} hitSlop={12} onPress={onClose}>
             <Text style={styles.closeTxt}>✕</Text>
           </Pressable>
-          <Text style={styles.confirmTitle}>{t("recap.writeTitle")}</Text>
+          <Text style={styles.confirmTitle}>{"Write your week?"}</Text>
           <Text style={styles.confirmSub}>
-            {events.length} {t("recap.cardSub")} — {t("recap.writeSub")}
+            {events.length} {"relive the week"} — {"every moment gets its own line, gathered vision by vision. May take a minute."}
           </Text>
           <Pressable style={styles.doneBtn} onPress={generate}>
-            <Text style={styles.doneTxt}>{t("recap.writeBtn")}</Text>
+            <Text style={styles.doneTxt}>{"✨ Write my week"}</Text>
           </Pressable>
           <Pressable style={styles.keepBtn} onPress={onClose}>
-            <Text style={styles.keepTxt}>{t("common.close")}</Text>
+            <Text style={styles.keepTxt}>{"Close"}</Text>
           </Pressable>
         </View>
       ) : phase === "loading" ? (
         <RecapLoading
-          visions={settings.visionCards.map((c) => c.text)}
           onClose={() => {
             cancelGeneration();
             onClose();
           }}
-          label={t("recap.building")}
+          label={"Building your week…"}
         />
       ) : phase === "error" ? (
         <View style={styles.errWrap}>
           <Pressable style={styles.close} hitSlop={12} onPress={onClose}>
             <Text style={styles.closeTxt}>✕</Text>
           </Pressable>
-          <Text style={styles.errTxt}>{t("reflect.error")}</Text>
+          <Text style={styles.errTxt}>{"Couldn't generate just now. Try again shortly."}</Text>
           {!!errMsg && <Text style={styles.errDetail}>[{errMsg}]</Text>}
           <Pressable style={styles.keepBtn} onPress={onClose}>
-            <Text style={styles.keepTxt}>{t("common.close")}</Text>
+            <Text style={styles.keepTxt}>{"Close"}</Text>
           </Pressable>
         </View>
       ) : (
         <RecapStories
           data={data!}
-          visionCards={settings.visionCards}
           momentCount={events.length}
           onClose={onClose}
           onClear={clearWeek}
@@ -174,11 +172,11 @@ export function WeeklyRecap({
   );
 }
 
-// Calm, alive loading: cycle the user's visions while the recap is written.
-function RecapLoading({ visions, label, onClose }: { visions: string[]; label: string; onClose: () => void }) {
+// Calm, alive loading while the recap is written.
+function RecapLoading({ label, onClose }: { label: string; onClose: () => void }) {
   const [i, setI] = useState(0);
   const fade = useRef(new Animated.Value(0)).current;
-  const pool = visions.length ? visions : [label];
+  const pool = [label];
 
   useEffect(() => {
     let idx = 0;
@@ -213,21 +211,18 @@ function RecapLoading({ visions, label, onClose }: { visions: string[]; label: s
 // Tap-through stories: intro → one per section → closing.
 function RecapStories({
   data,
-  visionCards,
   momentCount,
   onClose,
   onClear,
 }: {
   data: RecapData;
-  visionCards: { id: string; tint: number }[];
   momentCount: number;
   onClose: () => void;
   onClear: () => void;
 }) {
-  const { t } = useSettings();
   const [confirming, setConfirming] = useState(false);
   const [confirmText, setConfirmText] = useState("");
-  const confirmWord = t("recap.confirmWord");
+  const confirmWord = "Internalized";
   const confirmOk =
     confirmText.trim().toLocaleLowerCase("tr") === confirmWord.toLocaleLowerCase("tr");
   const scenes = useMemo<Scene[]>(() => {
@@ -253,8 +248,7 @@ function RecapStories({
 
   function tintFor(visionId: string | null) {
     if (!visionId) return cardTints[2];
-    const card = visionCards.find((c) => c.id === visionId);
-    return cardTints[(card?.tint ?? 0) % cardTints.length];
+    return cardTints[2];
   }
 
   useEffect(() => {
@@ -304,10 +298,10 @@ function RecapStories({
         <Animated.View style={[styles.scene, { opacity: fade, transform: [{ translateY: slideY }] }]}>
           {scene.kind === "intro" && (
             <>
-              <Text style={styles.kicker}>{t("recap.kicker")}</Text>
-              <Text style={styles.introTitle}>{t("recap.cardTitle")}</Text>
+              <Text style={styles.kicker}>{"This week"}</Text>
+              <Text style={styles.introTitle}>{"Weekly Recap"}</Text>
               <Text style={styles.introSub}>
-                {momentCount} {t("recap.cardSub")}
+                {momentCount} {"relive the week"}
               </Text>
             </>
           )}
@@ -328,21 +322,21 @@ function RecapStories({
           {isClosing && !confirming && (
           <>
             {!!data.closing && <Text style={styles.closing}>{data.closing}</Text>}
-            <Text style={styles.reassure}>{t("recap.reassure")}</Text>
+            <Text style={styles.reassure}>{"There is no past; you're creating the future right now. Don't be afraid — far more good is coming."}</Text>
             <Pressable style={styles.doneBtn} onPress={() => setConfirming(true)}>
-              <Text style={styles.doneTxt}>{t("recap.clear")}</Text>
+              <Text style={styles.doneTxt}>{"Clear this week, start fresh"}</Text>
             </Pressable>
             <Pressable style={styles.keepBtn} onPress={onClose}>
-              <Text style={styles.keepTxt}>{t("recap.keep")}</Text>
+              <Text style={styles.keepTxt}>{"Keep for now"}</Text>
             </Pressable>
           </>
         )}
 
         {isClosing && confirming && (
           <>
-            <Text style={styles.closing}>{t("recap.confirmTitle")}</Text>
+            <Text style={styles.closing}>{"Are you sure?"}</Text>
             <Text style={styles.reassure}>
-              {t("recap.confirmPrompt")} “{confirmWord}”
+              {"Type to confirm:"} “{confirmWord}”
             </Text>
             <View style={{ marginTop: spacing.md }}>
               <Field
@@ -358,10 +352,10 @@ function RecapStories({
               onPress={() => confirmOk && onClear()}
               disabled={!confirmOk}
             >
-              <Text style={styles.doneTxt}>{t("recap.confirmBtn")}</Text>
+              <Text style={styles.doneTxt}>{"Delete and start fresh"}</Text>
             </Pressable>
             <Pressable style={styles.keepBtn} onPress={() => setConfirming(false)}>
-              <Text style={styles.keepTxt}>{t("common.cancel")}</Text>
+              <Text style={styles.keepTxt}>{"Cancel"}</Text>
             </Pressable>
           </>
         )}
@@ -376,10 +370,10 @@ function RecapStories({
             onPress={goPrev}
             disabled={isFirst}
           >
-            <Text style={styles.navTxt}>‹ {t("recap.back")}</Text>
+            <Text style={styles.navTxt}>‹ {"Back"}</Text>
           </Pressable>
           <Pressable style={[styles.navBtn, styles.navBtnPrimary]} onPress={goNext}>
-            <Text style={[styles.navTxt, styles.navTxtPrimary]}>{t("recap.next")} ›</Text>
+            <Text style={[styles.navTxt, styles.navTxtPrimary]}>{"Next"} ›</Text>
           </Pressable>
         </View>
       )}

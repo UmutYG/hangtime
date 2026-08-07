@@ -5,7 +5,6 @@ import React, {
   useEffect,
   useState,
 } from "react";
-import { Lang, translate } from "./i18n";
 import {
   Settings,
   defaultSettings,
@@ -16,8 +15,6 @@ import {
 type Ctx = {
   settings: Settings;
   ready: boolean;
-  lang: Lang;
-  t: (key: string) => string;
   update: (patch: Partial<Settings>) => Promise<void>;
   reload: () => Promise<void>;
 };
@@ -46,10 +43,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const t = useCallback(
-    (key: string) => translate(settings.language, key),
-    [settings.language]
-  );
 
   const reload = useCallback(async () => {
     const s = await loadSettings();
@@ -58,7 +51,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <SettingsContext.Provider
-      value={{ settings, ready, lang: settings.language, t, update, reload }}
+      value={{ settings, ready, update, reload }}
     >
       {children}
     </SettingsContext.Provider>

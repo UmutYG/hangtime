@@ -16,8 +16,8 @@ const LOGO = require("../../../assets/mind-logo.png");
 // notice a positive sign, then a few living tiles — each one freshly made each
 // day, never a passive chore. Identity cards live in the Vision tab now.
 export default function PracticeScreen() {
-  const { t, lang } = useSettings();
-  const locale = lang === "tr" ? "tr-TR" : "en-US";
+  useSettings();
+  const locale = "en-US";
   const [logOpen, setLogOpen] = useState(false);
   const [recapOpen, setRecapOpen] = useState(false);
   const [dailyRecapOpen, setDailyRecapOpen] = useState(false);
@@ -87,7 +87,7 @@ export default function PracticeScreen() {
           against the warm, hand-drawn register everywhere else. */}
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.kicker}>{t("home.today")}</Text>
+          <Text style={styles.kicker}>{"Today"}</Text>
           <Text style={styles.date}>{prettyDate(new Date(), locale)}</Text>
         </View>
         <Pressable onPress={() => setSettingsOpen(true)} hitSlop={12} style={styles.gearBtn}>
@@ -100,7 +100,7 @@ export default function PracticeScreen() {
       {/* Notice a positive sign */}
       <Pressable style={styles.logRow} onPress={() => setLogOpen(true)}>
         <Text style={styles.spark}>✦</Text>
-        <Text style={styles.logText}>{t("practice.logPositive")}</Text>
+        <Text style={styles.logText}>{"Note a positive sign today…"}</Text>
         <Text style={styles.plus}>＋</Text>
       </Pressable>
 
@@ -110,7 +110,7 @@ export default function PracticeScreen() {
           replay. */}
       {showDailyRecap && (
         <Pressable style={styles.primaryTile} onPress={() => setDailyRecapOpen(true)}>
-          <Text style={styles.primaryTitle}>{t("dailyRecap.cardTitle")}</Text>
+          <Text style={styles.primaryTitle}>{"Day's Recap"}</Text>
           <Text style={styles.play}>▶</Text>
         </Pressable>
       )}
@@ -123,9 +123,9 @@ export default function PracticeScreen() {
         <Pressable style={styles.mirrorRow} onPress={() => setRecapOpen(true)}>
           <Text style={styles.mirrorGlyph}>◔</Text>
           <View style={{ flex: 1 }}>
-            <Text style={styles.mirrorTitle}>{t("recap.cardTitle")}</Text>
+            <Text style={styles.mirrorTitle}>{"Weekly Recap"}</Text>
             <Text style={styles.mirrorSub}>
-              {weekEvents.length} {t("recap.cardSub")}
+              {weekEvents.length} {"relive the week"}
             </Text>
           </View>
           <Text style={styles.play}>▶</Text>

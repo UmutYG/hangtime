@@ -4,7 +4,6 @@ import { colors, font, radius, spacing } from "../lib/theme";
 import { currentWeekStart } from "../lib/dates";
 import { useSettings } from "../lib/SettingsContext";
 import { getEvents, PositiveEvent } from "../lib/events";
-import { DEFAULT_VISION_ID, defaultVisionText } from "../lib/defaultVision";
 import { LogEventSheet } from "../components/LogEventSheet";
 import { EditEventSheet } from "../components/EditEventSheet";
 
@@ -13,8 +12,8 @@ import { EditEventSheet } from "../components/EditEventSheet";
 const NOTABLE_COUNT = 3;
 
 export default function FlowScreen() {
-  const { t, lang, settings } = useSettings();
-  const locale = lang === "tr" ? "tr-TR" : "en-US";
+  useSettings();
+  const locale = "en-US";
   const [events, setEvents] = useState<PositiveEvent[]>([]);
   const [logOpen, setLogOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<PositiveEvent | null>(null);
@@ -58,19 +57,6 @@ export default function FlowScreen() {
     });
   }
 
-  // Anything that isn't tied to one of the user's own visions still belongs
-  // somewhere real — it reads as the permanent "seeing the positive" vision,
-  // never a vague "unmatched" state. Covers the default id and any legacy
-  // event saved before this existed.
-  function cardText(id?: string): string {
-    if (id && id !== DEFAULT_VISION_ID) {
-      const own = settings.visionCards.find((c) => c.id === id)?.text;
-      if (own) return own;
-    }
-    return defaultVisionText(t);
-  }
-
-
   function pretty(date: string) {
     const [y, m, d] = date.split("-").map(Number);
     return new Date(y, m - 1, d).toLocaleDateString(locale, {
@@ -87,22 +73,22 @@ export default function FlowScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.subtitle}>{t("flow.subtitle")}</Text>
-      <Text style={styles.title}>{t("flow.title")}</Text>
+      <Text style={styles.subtitle}>{"Your wave of fortune — your positive signs"}</Text>
+      <Text style={styles.title}>{"Flow"}</Text>
       {weekCount > 0 && (
         <Text style={styles.weekTotal}>
-          {t("flow.thisWeek")} <Text style={styles.weekTotalNum}>{weekCount}</Text> {t("flow.signsMany")} ✦
+          {"This week"} <Text style={styles.weekTotalNum}>{weekCount}</Text> {"signs"} ✦
         </Text>
       )}
 
       <Pressable style={styles.logRow} onPress={() => setLogOpen(true)}>
         <Text style={styles.spark}>✦</Text>
-        <Text style={styles.logText}>{t("practice.logPositive")}</Text>
+        <Text style={styles.logText}>{"Note a positive sign today…"}</Text>
         <Text style={styles.plus}>＋</Text>
       </Pressable>
 
       {events.length === 0 ? (
-        <Text style={styles.empty}>{t("flow.empty")}</Text>
+        <Text style={styles.empty}>{"No signs yet. Note the positive things you notice during practice."}</Text>
       ) : (
         groups.map((g) => {
           const isCollapsed = collapsed.has(g.date);
@@ -120,7 +106,7 @@ export default function FlowScreen() {
                   <Text style={styles.groupDate}>{pretty(g.date)}</Text>
                   <Text style={[styles.groupCount, notable && styles.groupCountNotable]}>
                     {g.items.length}{" "}
-                    {g.items.length === 1 ? t("flow.signsOne") : t("flow.signsMany")}
+                    {g.items.length === 1 ? "sign" : "signs"}
                   </Text>
                 </View>
                 <View style={styles.chevWrap}>
@@ -133,11 +119,6 @@ export default function FlowScreen() {
                   {g.items.map((e) => (
                     <Pressable key={e.id} style={styles.item} onPress={() => setEditEvent(e)}>
                       <Text style={styles.itemText}>{e.text}</Text>
-                      {!!e.matchedCardId && (
-                        <Text style={styles.tag}>
-                          {t("flow.matched")} {cardText(e.matchedCardId)}
-                        </Text>
-                      )}
                     </Pressable>
                   ))}
                 </View>
