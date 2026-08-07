@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { addDays, nextStatus, slotTimeGuess, statusOf, supDayFor } from '../engine/supplements';
 import { absorptionNote, todayLine } from '../engine/absorption';
 import type { SupplementContext, SupplementItem, SupplementStatus } from '../engine/types';
@@ -89,6 +90,19 @@ export function SupTodayScreen() {
     if (status === 'taken') setFlash(item);
   };
 
+  /**
+   * Hold the tick to skip directly — the fast path for something like zinc,
+   * rarely taken. The tap cycle (null → taken → skipped) still exists, but it
+   * routes every first tap through "taken" and its two-step log, which is a
+   * lot of interaction when the honest answer was always going to be "no".
+   * Skipping never needs a time, so it also never opens anything.
+   */
+  const toggleSkip = (item: SupplementItem) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    const current = statusOf(day, item.id);
+    record(item, current === 'skipped' ? null : 'skipped');
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -142,6 +156,7 @@ export function SupTodayScreen() {
               <View key={it.id} style={[styles.row, idx === items.length - 1 && styles.rowLast]}>
                 <Pressable
                   onPress={() => record(it, nextStatus(status))}
+                  onLongPress={() => toggleSkip(it)}
                   hitSlop={8}
                   style={[
                     styles.tick,
@@ -257,7 +272,7 @@ export function SupTodayScreen() {
               </Pressable>
               <Pressable
                 onPress={() => {
-                  record(viewing, 'skipped');
+                  toggleSkip(viewing);
                   setViewing(null);
                 }}
                 style={[styles.sheetBtn, styles.sheetBtnGhost]}

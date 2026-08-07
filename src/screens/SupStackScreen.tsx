@@ -18,7 +18,6 @@ export function SupStackScreen() {
 
   const [editing, setEditing] = useState<SupplementItem | null>(null);
   const [isNew, setIsNew] = useState(false);
-  const [openMech, setOpenMech] = useState<SupplementMech | null>(null);
 
   const startNew = () => {
     setIsNew(true);
@@ -42,14 +41,6 @@ export function SupStackScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <RoofBar />
       <Text style={type.hero}>Stack</Text>
-      {/* The one place mechanics are spelled out. They used to sit permanently
-          under the daily list, where they were read once and then became
-          furniture; here they're a step away on the tab you already open when
-          you want to change how this room works. */}
-      <Text style={styles.note}>
-        On the daily list, tap a circle once for taken, twice for skipped. A skip is an answer,
-        not a gap — nothing here counts streaks.
-      </Text>
 
       <View style={styles.card}>
         <Text style={[type.kickerDim, { color: theme.supp }]}>YOUR STACK</Text>
@@ -79,26 +70,6 @@ export function SupStackScreen() {
         <Pressable onPress={startNew} style={styles.addBtn}>
           <Text style={styles.addBtnText}>+ Add an item</Text>
         </Pressable>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={[type.kickerDim, { color: theme.supp }]}>THE FIVE MECHANISMS</Text>
-        <Text style={styles.mechNote}>
-          Anything you add later, place it by asking which of these five governs it.
-        </Text>
-        {MECHS.map((m) => {
-          const open = openMech === m;
-          return (
-            <View key={m} style={styles.mechBlock}>
-              <Pressable style={styles.mechHead} onPress={() => setOpenMech(open ? null : m)}>
-                <View style={[styles.mechDot, { backgroundColor: MECH_COLOR[m] }]} />
-                <Text style={styles.mechName}>{MECH_INFO[m].name}</Text>
-                <Text style={styles.mechToggle}>{open ? '–' : '+'}</Text>
-              </Pressable>
-              {open ? <Text style={styles.mechBody}>{MECH_INFO[m].blurb}</Text> : null}
-            </View>
-          );
-        })}
       </View>
 
       <Text style={styles.footNote}>
@@ -213,7 +184,6 @@ export function SupStackScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: theme.pad, gap: 12, paddingBottom: 120 },
-  note: { color: theme.textDim, fontSize: 13, lineHeight: 19.5, marginTop: -6 },
   card: {
     backgroundColor: theme.card,
     borderWidth: 1,
@@ -238,12 +208,6 @@ const styles = StyleSheet.create({
   chev: { color: theme.textFaint, fontSize: 17, opacity: 0.6 },
   addBtn: { paddingVertical: 13, alignItems: 'center' },
   addBtnText: { color: theme.supp, fontSize: 13.5, fontWeight: '700' },
-  mechNote: { fontSize: 12.5, color: theme.textFaint, lineHeight: 18, marginBottom: 4 },
-  mechBlock: { borderBottomWidth: 1, borderBottomColor: theme.border },
-  mechHead: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
-  mechName: { flex: 1, fontSize: 14, fontWeight: '600', color: theme.text },
-  mechToggle: { fontSize: 15, color: theme.textFaint },
-  mechBody: { fontSize: 13, lineHeight: 19.5, color: theme.textDim, paddingBottom: 12, paddingLeft: 19 },
   footNote: {
     color: theme.textFaint,
     fontSize: 11.5,
