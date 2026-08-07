@@ -5,7 +5,6 @@ import { colors, cardTints, font, radius, spacing } from "../lib/theme";
 import { useSettings } from "../lib/SettingsContext";
 import { PositiveEvent } from "../lib/events";
 import { generateWeeklyRecap, RecapData, RecapSection } from "../lib/claude";
-import { buildInnerNotes } from "../lib/innerMap";
 import { Field } from "./ui";
 
 const CACHE_KEY = "weeklyRecap:v1";
@@ -90,14 +89,10 @@ export function WeeklyRecap({
     setPhase("loading");
     setErrMsg(null);
     try {
-      const notes = await buildInnerNotes().catch(() => []);
       const recap = await generateWeeklyRecap(
         settings.apiKey,
-        lang,
-        settings.visionCards,
         events,
-        controller.signal,
-        notes
+        controller.signal
       );
       // Cache FIRST, then update state: a close mid-generation used to hit
       // the alive-check before the cache write, billing the full call and

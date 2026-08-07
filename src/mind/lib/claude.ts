@@ -1,7 +1,4 @@
-import { Lang } from "./i18n";
-import { VisionCard } from "./settings";
 import { PositiveEvent } from "./events";
-import { byCategory, citationText } from "./citations";
 
 // Haiku is fast and cheap — good enough for generation tasks.
 const MATCH_MODEL = "claude-haiku-4-5";
@@ -17,16 +14,6 @@ export type RecapSection = {
   points: string[];
 };
 export type RecapData = { sections: RecapSection[]; closing: string };
-
-// One card of the daily mirror feed — a corner for imagining your slide when
-// you're too tired to do it yourself. "slide" speaks the vision as present
-// reality; "ordinary" folds it into a mundane scene so it becomes
-// commonplace. (Real noticed moments live in the recap features, not here.)
-export type MirrorReel = {
-  kind: "slide" | "ordinary";
-  visionId: string | null;
-  text: string;
-};
 
 export class NoApiKeyError extends Error {
   constructor() {
@@ -84,74 +71,52 @@ async function fetchWithTimeout(
   }
 }
 
-// Ask Claude which vision card a logged positive event best supports, and —
-// in the same call — whether it's also living proof of one of the person's
-// own named strengths (their "Pozitif Yönlerim" list). Returns the matched
-// card id (or null) plus a short, localized reason, and optionally a
-// strength id + reaffirmation line.
+/**
+ * The weekly pool of notification lines.
+ *
+ * The grounding ideas below used to be injected as sourced quotations from a
+ * citations file, and coloured further by an "inner map" built from the vision
+ * board and strengths list. Both are gone; the ideas remain here as plain
+ * prose, which is all the prompt ever needed — the lines were never allowed to
+ * quote or name a source anyway.
+ */
 export async function generateHeartfeltReminders(
   apiKey: string,
-  lang: Lang,
-  n: number,
-  innerNotes: string[] = []
+  n: number
 ): Promise<string[]> {
   if (!apiKey) throw new NoApiKeyError();
-  const language = lang === "tr" ? "Turkish" : "English";
-  const notes = innerNotes.length
-    ? "\n\nPrivate glimpses of how becoming their vision feels to this person " +
-      "(let these quietly color a few lines; NEVER quote, reference or hint at " +
-      "them directly):\n" + innerNotes.map((x) => `- ${x}`).join("\n")
-    : "";
-  const anchors = [...byCategory("importance"), ...byCategory("pendulum")]
-    .map((c) => `- ${citationText(c, lang)}`)
-    .join("\n");
 
   const system =
     `Generate ${n} very short notification lines. Write the way a close, ` +
-    "casual friend would text — everyday spoken language. This is NOT a " +
-    "translation exercise: don't compose the idea in English idiom first " +
-    "and carry it over — think and write directly in the target language's " +
-    "own casual register. In Turkish specifically: natural colloquial " +
-    "constructions (\"unutmayadabilirdin\", \"kim tutuyor seni\", \"bi'\" for " +
-    "\"bir\" where it sounds natural), never a stiff or literal-feeling " +
-    "translated sentence, never bookish/self-help vocabulary (no " +
-    "\"farkındalık\", \"an'da kalmak\" and the like). Calibration — match " +
-    "this exact register and directness, never reuse these lines " +
-    "verbatim:\n" +
-    'TR: "Bugün güzel bir şey oldu, hemen unuttun değil mi? Unutmayadabilirdin. Kim tutuyor seni?"\n' +
-    'TR: "3 saniye de olsa, o güzel hissi bir daha yaşasan ne olur?"\n' +
-    'EN: "Something good happened today and you probably forgot it already. Didn\'t have to. Who\'s stopping you?"\n' +
-    'EN: "Even three seconds — relive that good feeling, why not?"\n\n' +
-    `Two blended registers, roughly half each, mixed in no fixed order, ` +
+    "casual friend would text — everyday spoken language, never bookish or " +
+    "self-help vocabulary. Calibration — match this exact register and " +
+    "directness, never reuse these lines verbatim:\n" +
+    '"Something good happened today and you probably forgot it already. Didn\'t have to. Who\'s stopping you?"\n' +
+    '"Even three seconds — relive that good feeling, why not?"\n\n' +
+    "Two blended registers, roughly half each, mixed in no fixed order, " +
     "never labeled:\n\n" +
     "REGISTER A — quiet agency over attention, right now: the felt " +
     "realization that nothing, in this exact moment, is stopping you from " +
     "holding a good moment a few seconds longer, from returning to it, from " +
     "choosing what your attention rests on. Casual, direct, sometimes a " +
-    "light 'kim tutuyor seni' / 'who's stopping you' dare. STRICTLY " +
-    "FORBIDDEN: guilt-flavored comparisons with negativity ('if it were bad " +
-    "you'd have told three people', 'you never forget what went wrong') — " +
-    "no scolding, no teasing the reader about their habits, ever.\n\n" +
-    "REGISTER B — the same casual, spoken voice landing ONE idea at a time, " +
-    "grounded in (never quote, cite, or name the source — this is only " +
-    "your private grounding):\n" +
-    anchors +
-    "\n\nTranslate one of these into something a person could feel in their " +
-    "body in the next five seconds — whatever's looming in your head is " +
-    "bigger there than it is in reality; a calm person doesn't give a " +
-    "pendulum anything to hook into; only this breath is actually happening; " +
-    "and the coordination stance: you can decide, right in the moment a snag " +
+    "light 'who's stopping you' dare. STRICTLY FORBIDDEN: guilt-flavored " +
+    "comparisons with negativity ('if it were bad you'd have told three " +
+    "people', 'you never forget what went wrong') — no scolding, no teasing " +
+    "the reader about their habits, ever.\n\n" +
+    "REGISTER B — the same casual, spoken voice landing ONE idea at a time: " +
+    "whatever's looming in your head is bigger there than it is in reality; " +
+    "a calm person gives worry nothing to hook into; only this breath is " +
+    "actually happening; and you can decide, right in the moment a snag " +
     "appears, that everything is unfolding as it should — including this — " +
-    "and watch it become part of the right road. " +
-    "Never mystical, lecture-y, or abstract — the idea has to land as " +
-    "something completely ordinary and immediate, said the way you'd " +
-    "actually text a friend, not summarize a concept.\n\n" +
+    "and watch it become part of the right road. Never mystical, lecture-y, " +
+    "or abstract — the idea has to land as something completely ordinary and " +
+    "immediate, said the way you'd actually text a friend, not summarize a " +
+    "concept.\n\n" +
     "Whichever register: never generic ('stay positive'), never preachy, " +
     "never task-like, no exclamation marks. Every single line must end with " +
     "real terminal punctuation — a period, question mark, or ellipsis — " +
     "never left hanging with no mark at all. " +
-    `Each under ~130 characters, no numbering, no quotes.${notes} ` +
-    `Write every line in ${language}.`;
+    "Each under ~130 characters, no numbering, no quotes.";
 
   const res = await fetchWithTimeout(API_URL, {
     method: "POST",
@@ -165,7 +130,7 @@ export async function generateHeartfeltReminders(
       model: MATCH_MODEL,
       max_tokens: 900,
       system,
-      messages: [{ role: "user", content: `Write the ${n} reminders now, in ${language}.` }],
+      messages: [{ role: "user", content: `Write the ${n} reminders now.` }],
       output_config: {
         format: {
           type: "json_schema",
@@ -193,24 +158,23 @@ export async function generateHeartfeltReminders(
 // visions they belong to and reflects back "who you're becoming" — a fluid
 // review, not a quiz. Shared by the weekly recap (past, completed weeks) and
 // the same-day recap (today, cached and re-picked-up on demand).
+/**
+ * The recap: the day (or week) read back as evidence.
+ *
+ * It used to group moments under the user's vision cards. With the vision
+ * board gone the model finds the groupings itself from the moments alone —
+ * which is closer to the point anyway: the themes come out of what actually
+ * happened, not out of a wall of identities to live up to.
+ */
 async function buildRecap(
   apiKey: string,
-  lang: Lang,
-  visionCards: VisionCard[],
   events: PositiveEvent[],
   period: "day" | "week",
-  signal?: AbortSignal,
-  innerNotes: string[] = []
+  signal?: AbortSignal
 ): Promise<RecapData> {
   if (!apiKey) throw new NoApiKeyError();
-  const language = lang === "tr" ? "Turkish" : "English";
   const periodLabel = period === "week" ? "weekly" : "same-day";
-  const groupLabel = period === "week" ? "the week's" : "today's";
   const momentsLabel = period === "week" ? "This week's moments" : "Today's moments";
-
-  const cards = visionCards
-    .map((c) => `- id:${c.id} — ${c.text.trim()}`)
-    .join("\n");
   const moments = events.map((e) => `- ${e.text.trim()}`).join("\n");
 
   // The weekly recap is the once-a-week full replay: every single moment gets
@@ -219,38 +183,29 @@ async function buildRecap(
   // token ceiling much higher. The daily recap stays a light skim.
   const pointsRule =
     period === "week"
-      ? "then list EVERY related moment as its own point — do not summarize " +
-        "several into one, do not skip any, oldest to newest. Lightly polish " +
-        "each into one warm, concrete line that still clearly names the real " +
-        "moment. The user scrolls; completeness matters more than brevity. "
+      ? "then list EVERY moment belonging to it as its own point — do not " +
+        "summarize several into one, do not skip any, oldest to newest. " +
+        "Lightly polish each into one warm, concrete line that still clearly " +
+        "names the real moment. The user scrolls; completeness matters more " +
+        "than brevity. "
       : "then 2-4 concise key points drawn from the real moments (reframed, " +
         "encouraging). ";
 
   const system =
     `You create a warm, Spotify-Wrapped-style ${periodLabel} recap for someone ` +
-    `shifting how they see the world (Reality Transurfing). Group ${groupLabel} ` +
-    "noticed moments under the visions (identities) they relate to. For each " +
-    "vision that has at least one related moment, write a short narrative (2-3 " +
-    "sentences, second person, present tense) about who they're becoming — e.g. " +
-    "'you're learning not to take judgement personally' — " +
+    "practising noticing what is already good in their life. Read " +
+    `${momentsLabel.toLowerCase()} and group them into a small number of ` +
+    "themes you find in the moments themselves — two to four for a day, more " +
+    "for a week — and title each theme in a few plain words. For each theme " +
+    "write a short narrative (2-3 sentences, second person, present tense) " +
+    "about what it shows, " +
     pointsRule +
-    "Moments that " +
-    "fit no vision go in one section with visionId set to an empty string, " +
-    "titled as a general awareness. Alive and warm, never robotic or task-like. " +
-    "End with one short, freeing closing line. " +
-    `CRITICAL: write all text in ${language}. Use each vision's exact id, or an ` +
-    "empty string for the general section.";
-
-  const notesBlock = innerNotes.length
-    ? "\n\nPrivate notes on how becoming these visions feels to them — use " +
-      "only to choose feelings and phrasings that will land; NEVER quote, " +
-      "reference or hint at these directly:\n" +
-      innerNotes.map((x) => `- ${x}`).join("\n")
-    : "";
+    "Alive and warm, never robotic or task-like. End with one short, freeing " +
+    "closing line. Never invent a moment that is not in the list. Leave " +
+    "visionId as an empty string on every section.";
 
   const user =
-    `Visions:\n${cards || "- (none)"}${notesBlock}\n\n${momentsLabel}:\n${moments || "- (none)"}\n\n` +
-    `Write the recap now, in ${language}.`;
+    `${momentsLabel}:\n${moments || "- (none)"}\n\nWrite the recap now.`;
 
   const res = await fetchWithTimeout(API_URL, {
     method: "POST",
@@ -302,7 +257,7 @@ async function buildRecap(
   const out = data?.content?.find((b: any) => b.type === "text")?.text ?? "{}";
   const parsed = JSON.parse(out);
   const sections: RecapSection[] = (parsed.sections ?? []).map((s: any) => ({
-    visionId: s.visionId ? s.visionId : null, // "" → general section
+    visionId: null,
     title: s.title ?? "",
     narrative: s.narrative ?? "",
     points: s.points ?? [],
@@ -312,248 +267,18 @@ async function buildRecap(
 
 export async function generateWeeklyRecap(
   apiKey: string,
-  lang: Lang,
-  visionCards: VisionCard[],
   events: PositiveEvent[],
-  signal?: AbortSignal,
-  innerNotes: string[] = []
+  signal?: AbortSignal
 ): Promise<RecapData> {
-  return buildRecap(apiKey, lang, visionCards, events, "week", signal, innerNotes);
+  return buildRecap(apiKey, events, "week", signal);
 }
 
 export async function generateDailyRecap(
   apiKey: string,
-  lang: Lang,
-  visionCards: VisionCard[],
   events: PositiveEvent[],
-  signal?: AbortSignal,
-  innerNotes: string[] = []
+  signal?: AbortSignal
 ): Promise<RecapData> {
-  return buildRecap(apiKey, lang, visionCards, events, "day", signal, innerNotes);
-}
-
-// Guarantee the reflection reads as calm, spaced-out lines regardless of how
-// the model formatted it: one sentence per line, a blank line between each.
-function tidyReflection(raw: string): string {
-  const text = raw.trim();
-  if (!text) return text;
-  const lines = text.includes("\n")
-    ? text.split(/\n+/) // model already broke lines — just normalize spacing
-    : text.split(/(?<=[.!?…])\s+/); // one paragraph — split into sentences
-  return lines
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .join("\n\n");
-}
-
-// Generate today's mirror feed: a short, finite stack of full-screen cards
-// that hand-feed the user's own visions back to them — a corner for when
-// imagining your slide yourself feels like too much effort. Real noticed
-// moments belong to the daily/weekly recap ("repeat the day"), not here; this
-// is purely slide + ordinary-scene material, following the book: systematic
-// repetition, one vision and one feeling per card, participant language
-// (never an observer), visions made commonplace rather than distant.
-export async function generateMirrorFeed(
-  apiKey: string,
-  lang: Lang,
-  visionCards: VisionCard[],
-  events: PositiveEvent[],
-  innerNotes: string[] = []
-): Promise<MirrorReel[]> {
-  if (!apiKey) throw new NoApiKeyError();
-  const language = lang === "tr" ? "Turkish" : "English";
-
-  // Vision-matching no longer happens at log time (a positive log's only
-  // job is strengthening the ability to notice the positive), so events
-  // arrive here unsorted by vision. Instead of reading a stored match, this
-  // call does its own grouping as part of the same generation — same one
-  // cached call per day, just folding the judgment call in rather than
-  // reading it off `matchedCardId`. Recent moments are handed over as a
-  // flat, ungrouped list; the model decides which (if any) vision each one
-  // colors, and may let a scene quietly echo one — never quoted verbatim.
-  const cards = visionCards.map((c) => `- id:${c.id} — ${c.text.trim()}`).join("\n");
-  const recentMoments = events
-    .slice(0, 20)
-    .map((e) => `"${e.text.trim().slice(0, 70)}"`)
-    .join(", ");
-
-  const system =
-    "You write a small, finite stack of full-screen cards for someone who " +
-    "feels too tired to imagine their own vision right now — you imagine it " +
-    "for them, so it lands in their mind either way. Two card kinds:\n" +
-    "- slide: speak ONE vision as present, already-real experience; feeling " +
-    "language, from inside the moment, never describing a picture from outside.\n" +
-    "- ordinary: place ONE vision inside a mundane everyday scene (morning " +
-    "coffee, a walk, closing a door) so it feels commonplace, not distant.\n" +
-    "Rules: second person, present tense. ONE vision and ONE feeling per card. " +
-    "1-3 short sentences, EACH SENTENCE ON ITS OWN LINE. Plain, warm, daily " +
-    "language — the register of a good meditation app; no hype, no exclamation " +
-    "marks, no emoji, never mention any book, method or technique. Feelings " +
-    "over pictures. Never invent facts about their life beyond what's given. " +
-    "A list of recently noticed real moments may follow, not yet tied to any " +
-    "specific vision — silently judge which (if any) vision each one colors, " +
-    "and use that sense to decide which visions feel least represented so " +
-    "far and deserve a little more weight, and let a scene quietly echo a " +
-    "fitting moment's setting or feeling where it helps it land as their own " +
-    "life — but never quote one back word-for-word. " +
-    `Use each vision's exact id in visionId. CRITICAL: write every text in ${language}.`;
-
-  const notes = innerNotes.length
-    ? "\n\nPrivate notes on how becoming these visions feels to them — use " +
-      "only to choose feelings and scenes that will land; NEVER quote, " +
-      "reference or hint at these directly:\n" +
-      innerNotes.map((x) => `- ${x}`).join("\n")
-    : "";
-
-  const user =
-    `Visions:\n${cards || "- (none)"}\n\n` +
-    `Recently noticed (not yet tied to any specific vision): ${recentMoments || "(none)"}` +
-    `${notes}\n\n` +
-    "Write exactly 12 cards: 8 slide, 4 ordinary. Spread them across the " +
-    `visions. Vary the openings. Write in ${language}.`;
-
-  const res = await fetchWithTimeout(API_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model: SMART_MODEL,
-      max_tokens: 1800,
-      system,
-      messages: [{ role: "user", content: user }],
-      output_config: {
-        format: {
-          type: "json_schema",
-          schema: {
-            type: "object",
-            properties: {
-              cards: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    kind: {
-                      type: "string",
-                      enum: ["slide", "ordinary"],
-                    },
-                    visionId: { type: "string" },
-                    text: { type: "string" },
-                  },
-                  required: ["kind", "visionId", "text"],
-                  additionalProperties: false,
-                },
-              },
-            },
-            required: ["cards"],
-            additionalProperties: false,
-          },
-        },
-      },
-    }),
-  }, undefined, 120_000);
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Claude API ${res.status}: ${body.slice(0, 200)}`);
-  }
-  const data = await res.json();
-  const out = data?.content?.find((b: any) => b.type === "text")?.text ?? "{}";
-  const parsed = JSON.parse(out);
-  const validIds = new Set(visionCards.map((c) => c.id));
-  return (parsed.cards ?? [])
-    .filter((c: any) => c?.text)
-    .map((c: any) => ({
-      kind: c.kind,
-      visionId: c.visionId && validIds.has(c.visionId) ? c.visionId : null,
-      text: tidyReflection(String(c.text)),
-    }));
-}
-
-// Generate the lines shown right after the user answers a vision question —
-// each one telling them, in fresh words, that they've drawn a step closer to
-// the person in the mirror. Regenerated weekly (cached by the caller) so the
-// same motivation returns in different clothes, seasoned by the mental map.
-export async function generateMirrorLines(
-  apiKey: string,
-  lang: Lang,
-  n: number,
-  innerNotes: string[] = []
-): Promise<string[]> {
-  if (!apiKey) throw new NoApiKeyError();
-  const language = lang === "tr" ? "Turkish" : "English";
-  const notes = innerNotes.length
-    ? "\n\nPrivate glimpses of how becoming their vision feels to this person " +
-      "(let these quietly color the tone; NEVER quote, reference or hint at " +
-      "them directly):\n" + innerNotes.map((x) => `- ${x}`).join("\n")
-    : "";
-  const system =
-    `Generate ${n} very short acknowledgment lines shown the moment someone ` +
-    "finishes answering a deep question about the person they're becoming. " +
-    "Every line carries ONE feeling in fresh words: the honest answer just " +
-    "drew them a step closer to the person in the mirror — the image sharpens, " +
-    "the distance quietly shrinks. Warm, intimate, a little poetic, never " +
-    "coach-like, never generic praise ('great job'), no exclamation marks. " +
-    "The mirror metaphor may appear in some lines but must not be in all of " +
-    "them. Every line must end with real terminal punctuation — a period, " +
-    "question mark, or ellipsis — never left hanging with no mark at all. " +
-    `Each under ~90 characters, no numbering, no quotes.${notes} ` +
-    `Write every line in ${language}.`;
-  return fetchLines(apiKey, system, n, language, 700);
-}
-
-// The daily "is this vision really yours?" questions, generated fresh each
-// week from the person's own inner map instead of rotating a fixed list —
-// the asking itself evolves with the person. Cached weekly by the caller
-// (whyQuestions.ts); the static i18n q1..q10 stay the offline floor.
-export async function generateWhyQuestions(
-  apiKey: string,
-  lang: Lang,
-  n: number,
-  innerNotes: string[] = [],
-  visions: string[] = []
-): Promise<string[]> {
-  if (!apiKey) throw new NoApiKeyError();
-  const language = lang === "tr" ? "Turkish" : "English";
-  // Each question is shown directly beneath ONE current vision sentence, and
-  // any question can land under any of them — so a question must never carry
-  // a subject of its own (that's how old, archived visions used to bleed
-  // through). It may only point at "it" / "this" / "that person".
-  const wall = visions.length
-    ? "\n\nEach question appears directly beneath one of the visions " +
-      "currently on their wall (listed below), and any question may appear " +
-      "under any of them. So every question must read naturally under each " +
-      "one: refer to the vision only as \"it\", \"this\" or \"that person\" — " +
-      "never name a topic, goal or life area, and never quote the visions. " +
-      "Current visions:\n" +
-      visions.map((x) => `- ${x.trim().slice(0, 140)}`).join("\n")
-    : "\n\nRefer to the vision only as \"it\", \"this\" or \"that person\" — " +
-      "never name a specific topic, goal or life area, so the question fits " +
-      "whichever vision it appears beneath.";
-  const notes = innerNotes.length
-    ? "\n\nPrivate glimpses of this person's inner world (let these quietly " +
-      "shape which feelings are worth asking about; NEVER quote, reference " +
-      "or hint at them directly):\n" + innerNotes.map((x) => `- ${x}`).join("\n")
-    : "";
-  const system =
-    `Generate ${n} very short questions asked, one per day, of someone ` +
-    "holding a vision of the person they are becoming. Each question probes " +
-    "FEELING, never planning or effort: does the heart ease or tighten when " +
-    "they picture it; does wanting it give energy or drain it; is this " +
-    "genuinely theirs or adopted from someone else's script; how ordinary " +
-    "and everyday does the already-real version feel; what would a small " +
-    "morning look like as that person; the inner-no test — if they'd have to " +
-    "talk themselves into a yes, something inside already said no, so ask " +
-    "whether the yes comes by itself; and the own-door sense — does the way " +
-    "toward it feel like their own doorway opening easily, or like forcing " +
-    "someone else's. Warm, intimate, second person, one " +
-    "question each — never two questions in one line, never advice. Vary the " +
-    "angle across the set so no two feel like siblings. Every line must end " +
-    "with a question mark. Each under ~110 characters, no numbering, no " +
-    `quotes.${wall}${notes} Write every question in ${language}.`;
-  return fetchLines(apiKey, system, n, language, 800);
+  return buildRecap(apiKey, events, "day", signal);
 }
 
 // The weekly "voice pack": every micro-line the app speaks in passing —
@@ -574,39 +299,23 @@ export type VoicePack = {
 
 export async function generateVoicePack(
   apiKey: string,
-  lang: Lang,
-  innerNotes: string[] = []
 ): Promise<VoicePack> {
   if (!apiKey) throw new NoApiKeyError();
-  const language = lang === "tr" ? "Turkish" : "English";
-  const notes = innerNotes.length
-    ? "\n\nPrivate glimpses of this person's inner world (let these quietly " +
-      "color word choice and imagery; NEVER quote, reference or hint at " +
-      "them directly):\n" + innerNotes.map((x) => `- ${x}`).join("\n")
-    : "";
   const system =
     "You write the tiny passing lines of a warm companion app built around " +
     "one stance: nothing, right now, stops you from resting your attention " +
     "on what's already good. Write the way a close, casual friend would " +
-    "text — everyday spoken language. This is NOT a translation exercise: " +
-    "don't compose the idea in English idiom first and carry it over — " +
-    "think and write directly in the target language's own casual " +
-    "register. In Turkish specifically: natural colloquial constructions " +
-    "(\"unutmayadabilirdin\", \"kim tutuyor seni\", \"bi'\" for \"bir\" " +
-    "where it sounds natural), never a stiff or literal-feeling translated " +
-    "sentence, never bookish/self-help vocabulary. Calibration — match this " +
-    "exact register and directness, never reuse these lines verbatim (shown " +
-    "here without the {moment} placeholder, which sets below use):\n" +
-    'TR: "Bugün güzel bir şey oldu, hemen unuttun değil mi? Unutmayadabilirdin. Kim tutuyor seni?"\n' +
-    'TR: "3 saniye de olsa, o güzel hissi bir daha yaşasan ne olur?"\n' +
-    'EN: "Something good happened today and you probably forgot it already. Didn\'t have to. Who\'s stopping you?"\n' +
-    'EN: "Even three seconds — relive that good feeling, why not?"\n\n' +
+    "text — everyday spoken language, never bookish or self-help vocabulary. " +
+    "Calibration — match this exact register and directness, never reuse " +
+    "these lines verbatim (shown here without the {moment} placeholder, " +
+    "which sets below use):\n" +
+    '"Something good happened today and you probably forgot it already. Didn\'t have to. Who\'s stopping you?"\n' +
+    '"Even three seconds — relive that good feeling, why not?"\n\n' +
     "One intimate voice across both sets — a present friend, not a coach, " +
     "but a friend with a spine: the lines hold space rather than instruct, " +
     "and never compare the person to some hypothetical worse reaction ('if " +
     "it were bad you'd have told three people' — never that move, ever). " +
-    "Rhetorical 'who's stopping you' / 'kim tutuyor seni' " +
-    "questions are welcome and encouraged where noted. No exclamation " +
+    "Rhetorical 'who's stopping you' questions are welcome. No exclamation " +
     "marks; every line ends with real terminal punctuation; each under " +
     "~120 characters, no numbering, no surrounding quotes. Sets marked " +
     "with {moment} wrap the person's OWN words: those lines must contain " +
@@ -617,8 +326,7 @@ export async function generateVoicePack(
     "- echo (4): a morning line wrapping {moment} = something they noticed " +
     "YESTERDAY — the light of it is still theirs, today's is still unnamed.\n" +
     "- invites (5): an evening line inviting them to leave one small good " +
-    `thing from the day; warm, tiny, zero pressure; no placeholder.${notes}\n\n` +
-    `Write every line in ${language}.`;
+    "thing from the day; warm, tiny, zero pressure; no placeholder.";
 
   const res = await fetchWithTimeout(API_URL, {
     method: "POST",
@@ -632,7 +340,7 @@ export async function generateVoicePack(
       model: MATCH_MODEL,
       max_tokens: 2000,
       system,
-      messages: [{ role: "user", content: `Write the full voice pack now, in ${language}.` }],
+      messages: [{ role: "user", content: "Write the full voice pack now." }],
       output_config: {
         format: {
           type: "json_schema",
@@ -662,49 +370,4 @@ export async function generateVoicePack(
     echo: clean(parsed.echo),
     invites: clean(parsed.invites),
   };
-}
-
-// Shared plumbing for the cheap line-pool generators (mirror thanks, why
-// questions): one fetch, one {lines: []} schema.
-async function fetchLines(
-  apiKey: string,
-  system: string,
-  n: number,
-  language: string,
-  maxTokens: number
-): Promise<string[]> {
-  const res = await fetchWithTimeout(API_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model: MATCH_MODEL,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: "user", content: `Write the ${n} lines now, in ${language}.` }],
-      output_config: {
-        format: {
-          type: "json_schema",
-          schema: {
-            type: "object",
-            properties: { lines: { type: "array", items: { type: "string" } } },
-            required: ["lines"],
-            additionalProperties: false,
-          },
-        },
-      },
-    }),
-  }, undefined, 60_000);
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Claude API ${res.status}: ${body.slice(0, 200)}`);
-  }
-  const data = await res.json();
-  const out = data?.content?.find((b: any) => b.type === "text")?.text ?? "{}";
-  const lines: string[] = JSON.parse(out).lines ?? [];
-  return lines.map((l) => l.trim()).filter(Boolean);
 }

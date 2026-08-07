@@ -56,6 +56,10 @@
 	<string>Allow $(PRODUCT_NAME) to access your location</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Roof uses your location to track distance and pace while you run — only during a run you start.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Roof uses the microphone only while you hold the mic button, to write down a moment you speak.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Speech is turned into text on your device so you can log a moment by saying it instead of typing.</string>
 	<key>NSUbiquitousContainers</key>
 	<dict>
 		<key>iCloud.com.umutyg.hangtime</key>

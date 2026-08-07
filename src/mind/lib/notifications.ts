@@ -6,7 +6,6 @@ import { Lang } from "./i18n";
 import { dateKey, dateIndex, addDays } from "./dates";
 import { addEvent, getEvents, PositiveEvent } from "./events";
 import { generateHeartfeltReminders } from "./claude";
-import { buildInnerNotes } from "./innerMap";
 import { normalizeLines } from "./text";
 import { getVoicePack, fillMoment } from "./voicePack";
 
@@ -225,8 +224,7 @@ async function getHeartfeltLines(lang: Lang, apiKey: string): Promise<string[]> 
   let lines = FALLBACK[lang];
   if (apiKey) {
     try {
-      const notes = await buildInnerNotes().catch(() => []);
-      const gen = await generateHeartfeltReminders(apiKey, lang, 14, notes);
+      const gen = await generateHeartfeltReminders(apiKey, 14);
       if (gen.length >= DAYS_AHEAD) lines = normalizeLines(gen);
     } catch {
       // keep fallback

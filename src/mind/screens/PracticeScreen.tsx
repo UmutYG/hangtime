@@ -5,12 +5,9 @@ import { colors, font, radius, spacing } from "../lib/theme";
 import { prettyDate, dateKey, currentWeekStart } from "../lib/dates";
 import { useSettings } from "../lib/SettingsContext";
 import { getEvents, deleteEvents, PositiveEvent } from "../lib/events";
-import { dailyQuote } from "../lib/quotes";
 import { LogEventSheet } from "../components/LogEventSheet";
 import { WeeklyRecap } from "../components/WeeklyRecap";
 import { DailyRecap } from "../components/DailyRecap";
-import { MirrorFeedSheet } from "../components/MirrorFeedSheet";
-import { QuoteSheet } from "../components/QuoteSheet";
 import SettingsScreen from "./SettingsScreen";
 
 const LOGO = require("../../../assets/mind-logo.png");
@@ -24,8 +21,6 @@ export default function PracticeScreen() {
   const [logOpen, setLogOpen] = useState(false);
   const [recapOpen, setRecapOpen] = useState(false);
   const [dailyRecapOpen, setDailyRecapOpen] = useState(false);
-  const [feedOpen, setFeedOpen] = useState(false);
-  const [quoteOpen, setQuoteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [events, setEvents] = useState<PositiveEvent[]>([]);
 
@@ -54,7 +49,6 @@ export default function PracticeScreen() {
   // skipped week still deserves a review; it shouldn't sit forever unreviewed
   // just because it isn't Sunday.
   const today = dateKey();
-  const quote = dailyQuote(lang);
   const weekStart = currentWeekStart();
   const weekEvents = events.filter((e) => e.date < weekStart);
 
@@ -110,28 +104,6 @@ export default function PracticeScreen() {
         <Text style={styles.plus}>＋</Text>
       </Pressable>
 
-      {/* Mirror feed — the finite daily reel stack; noticing and being
-          reflected sit side by side at the top of the day */}
-      <Pressable style={styles.mirrorRow} onPress={() => setFeedOpen(true)}>
-        <Text style={styles.mirrorGlyph}>◐</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.mirrorTitle}>{t("mirror.cardTitle")}</Text>
-          <Text style={styles.mirrorSub}>{t("mirror.cardSub")}</Text>
-        </View>
-        <Text style={styles.play}>▶</Text>
-      </Pressable>
-
-      {/* Daily quote — a button like Waking Up's; tapping opens the
-          full-screen lens. One a day, flips the bias. */}
-      <Pressable style={styles.mirrorRow} onPress={() => setQuoteOpen(true)}>
-        <Text style={styles.mirrorGlyph}>❝</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.mirrorTitle}>{t("quote.cardTitle")}</Text>
-          <Text style={styles.mirrorSub}>{quote.source}</Text>
-        </View>
-        <Text style={styles.play}>▶</Text>
-      </Pressable>
-
       {/* The daily recap is the day's one warm accentSoft "hero" — replaying
           the day is the core repetition ritual, so it carries the weight the
           Daily Listen tile used to. Only shows once today has something to
@@ -178,12 +150,6 @@ export default function PracticeScreen() {
         events={weekSoFarEvents}
         onClose={() => setDailyRecapOpen(false)}
       />
-      <MirrorFeedSheet
-        visible={feedOpen}
-        events={events}
-        onClose={() => setFeedOpen(false)}
-      />
-      <QuoteSheet visible={quoteOpen} quote={quote} onClose={() => setQuoteOpen(false)} />
       <Modal visible={settingsOpen} animationType="slide" onRequestClose={() => setSettingsOpen(false)}>
         <View style={styles.settingsWrap}>
           <Pressable style={styles.settingsClose} hitSlop={12} onPress={() => setSettingsOpen(false)}>

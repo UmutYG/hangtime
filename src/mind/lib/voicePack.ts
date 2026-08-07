@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Lang } from "./i18n";
 import { generateVoicePack, VoicePack } from "./claude";
-import { buildInnerNotes } from "./innerMap";
 import { normalizeLines } from "./text";
 
 // v2: the voice went casual/spoken instead of translated-English-idiom
@@ -74,8 +73,7 @@ export async function getVoicePack(lang: Lang, apiKey: string): Promise<VoicePac
   if (!inFlight) {
     inFlight = (async () => {
       try {
-        const notes = await buildInnerNotes().catch(() => []);
-        const gen = await generateVoicePack(apiKey, lang, notes);
+        const gen = await generateVoicePack(apiKey);
         const pack = validate(gen);
         await AsyncStorage.setItem(
           CACHE_KEY,

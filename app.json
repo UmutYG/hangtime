@@ -50,7 +50,8 @@
         {
           "locationWhenInUsePermission": "Roof uses your location to track distance and pace while you run — only during a run you start."
         }
-      ]
+      ],
+      "@jamsch/expo-speech-recognition"
     ]
   }
 }

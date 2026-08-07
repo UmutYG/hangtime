@@ -6,7 +6,6 @@ import { useSettings } from "../lib/SettingsContext";
 import { PositiveEvent } from "../lib/events";
 import { dateKey, shortWeekday } from "../lib/dates";
 import { generateDailyRecap, RecapData, RecapSection } from "../lib/claude";
-import { buildInnerNotes } from "../lib/innerMap";
 
 const CACHE_KEY = "dailyRecap:v2";
 
@@ -98,16 +97,10 @@ export function DailyRecap({
     setPhase("loading");
     setErrMsg(null);
     try {
-      // The inner map quietly seasons the recap's feelings and phrasings
-      // without ever being surfaced.
-      const notes = await buildInnerNotes().catch(() => []);
       const recap = await generateDailyRecap(
         settings.apiKey,
-        lang,
-        settings.visionCards,
         dayEvents,
-        controller.signal,
-        notes
+        controller.signal
       );
       setData(recap);
       setPhase("ready");

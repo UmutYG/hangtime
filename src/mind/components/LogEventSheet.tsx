@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Modal,
   View,
@@ -9,6 +9,10 @@ import {
   Pressable,
 } from "react-native";
 import * as Haptics from "expo-haptics";
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from "expo-speech-recognition";
 import { colors, font, radius, spacing } from "../lib/theme";
 import { useSettings } from "../lib/SettingsContext";
 import { dateKey } from "../lib/dates";
@@ -36,13 +40,49 @@ export function LogEventSheet({
 }) {
   const { t } = useSettings();
   const [text, setText] = useState("");
+  const [listening, setListening] = useState(false);
+
+  // Speech goes straight into the same field typing does, so there is no
+  // second screen, no confirm step and nothing to review — say it, and it's
+  // written. Whatever was already typed is kept; dictation appends to it.
+  const baseText = useRef("");
+
+  useSpeechRecognitionEvent("start", () => setListening(true));
+  useSpeechRecognitionEvent("end", () => setListening(false));
+  useSpeechRecognitionEvent("result", (e) => {
+    const said = e.results?.[0]?.transcript ?? "";
+    if (!said) return;
+    const base = baseText.current;
+    setText(base ? `${base} ${said}` : said);
+  });
+  useSpeechRecognitionEvent("error", () => setListening(false));
+
+  async function toggleMic() {
+    if (listening) {
+      ExpoSpeechRecognitionModule.stop();
+      return;
+    }
+    const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!perm.granted) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    baseText.current = text.trim();
+    ExpoSpeechRecognitionModule.start({
+      lang: "en-US",
+      interimResults: true,
+      // stops on its own when you stop talking — one tap in, none out
+      continuous: false,
+    });
+  }
 
   function close() {
+    if (listening) ExpoSpeechRecognitionModule.stop();
     setText("");
+    setListening(false);
     onClose();
   }
 
   async function submit() {
+    if (listening) ExpoSpeechRecognitionModule.stop();
     const value = text.trim();
     if (!value) return;
     const event: PositiveEvent = {
@@ -70,11 +110,23 @@ export function LogEventSheet({
               value={text}
               onChangeText={setText}
               multiline
-              placeholder={t("event.placeholder")}
+              placeholder={listening ? t("event.listening") : t("event.placeholder")}
               autoFocus
             />
             <View style={{ height: spacing.md }} />
-            <PrimaryButton title={t("event.save")} onPress={submit} />
+            <View style={styles.row}>
+              <Pressable
+                onPress={toggleMic}
+                style={[styles.mic, listening && styles.micOn]}
+                accessibilityRole="button"
+                accessibilityLabel={t("event.speak")}
+              >
+                <Text style={[styles.micGlyph, listening && styles.micGlyphOn]}>●</Text>
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <PrimaryButton title={t("event.save")} onPress={submit} />
+              </View>
+            </View>
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
@@ -102,4 +154,17 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: spacing.md,
   },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  mic: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  micOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  micGlyph: { color: colors.textMuted, fontSize: 20 },
+  micGlyphOn: { color: colors.card },
 });

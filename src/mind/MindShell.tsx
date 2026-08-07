@@ -8,17 +8,18 @@ import { ensureNotifications, handleNotificationResponse } from "./lib/notificat
 import { SettingsProvider, useSettings } from "./lib/SettingsContext";
 import PracticeScreen from "./screens/PracticeScreen";
 import FlowScreen from "./screens/FlowScreen";
-import VisionScreen from "./screens/VisionScreen";
-import StrengthsScreen from "./screens/StrengthsScreen";
 import { RoofBar } from "../components/RoofBar";
 import { theme } from "../theme";
 
-// The Mind room — the Slide app living as a Roof module. Same four tabs, same
-// inner navigation, its own reminder system; Supabase/Siri/widget surfaces of
-// the standalone app were deliberately left behind (Roof has no accounts and
-// no phone-surface extras). Cloud safety net is the shared iCloud container.
+// The Mind room: notice a good thing, and look back at what you noticed.
+//
+// It arrived from the standalone Slide app with four tabs — a vision board and
+// a strengths list alongside these two. Both were surfaces you had to go and
+// re-read to get anything from them, which is the opposite of what this room
+// is for, so they were removed 2026-08-07. What's left is the noticing and the
+// record of it.
 
-type Tab = "practice" | "flow" | "vision" | "strengths";
+type Tab = "practice" | "flow";
 
 function Shell() {
   const { ready, settings, t, reload } = useSettings();
@@ -81,15 +82,11 @@ function Shell() {
       <View style={styles.screen}>
         {tab === "practice" && <PracticeScreen />}
         {tab === "flow" && <FlowScreen />}
-        {tab === "vision" && <VisionScreen />}
-        {tab === "strengths" && <StrengthsScreen />}
       </View>
 
       <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
-        <TabButton label={t("tab.practice")} active={tab === "practice"} onPress={() => setTab("practice")} />
-        <TabButton label={t("tab.flow")} active={tab === "flow"} onPress={() => setTab("flow")} />
-        <TabButton label={t("tab.vision")} active={tab === "vision"} onPress={() => setTab("vision")} />
-        <TabButton label={t("tab.strengths")} active={tab === "strengths"} onPress={() => setTab("strengths")} />
+        <TabButton label="Practice" active={tab === "practice"} onPress={() => setTab("practice")} />
+        <TabButton label="Flow" active={tab === "flow"} onPress={() => setTab("flow")} />
       </View>
     </View>
   );
